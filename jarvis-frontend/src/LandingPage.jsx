@@ -123,10 +123,10 @@ const Interactive3DCore = () => {
   );
 };
 
-export default function LandingPage() {
-  const handleLogin = () => {
+export default function LandingPage({ onLogin, isDark, setIsDark }) {
+  const handleLogin = onLogin || (() => {
     window.location.href = "https://jarvis-backend-h38f.onrender.com/api/auth/login";
-  };
+  });
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#07090e] text-slate-900 dark:text-slate-100 transition-colors duration-500 overflow-hidden relative selection:bg-purple-500 selection:text-white">
@@ -146,7 +146,7 @@ export default function LandingPage() {
           </span>
         </div>
 
-        <ThemeToggle />
+        <ThemeToggle isDark={isDark} setIsDark={setIsDark} />
       </header>
 
       {/* Hero Section */}
