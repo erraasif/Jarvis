@@ -52,4 +52,9 @@ def callback(code: str = None, error: str = None):
     # Store encrypted tokens in Supabase
     save_user_tokens(user_email, access_token, refresh_token, expires_in)
 
-    return {"message": "Successfully authenticated with Microsoft!", "user": user_email}
+    # Every other route (/chat, /emails, /events, /todos) identifies the user by
+    # user_email, not a bearer token, so hand it back to the frontend on redirect
+    # rather than returning bare JSON on the backend domain.
+    import urllib.parse
+    redirect_url = f"{settings.FRONTEND_URL}/?user_email={urllib.parse.quote(user_email)}"
+    return RedirectResponse(redirect_url)

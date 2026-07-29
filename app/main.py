@@ -1,18 +1,20 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.config import settings
 from app.api import auth, chat, emails, events, todos
 
 app = FastAPI(title="Jarvis Assistant API", version="1.0.0")
 
-# Allow requests from Frontend (Local + Live Vercel)
+# Allow requests from local dev + the deployed Vercel frontend.
+# FRONTEND_URL must be set on Render to your actual Vercel URL, e.g.
+# https://jarvis-frontend.vercel.app  (no trailing slash)
+allow_origins = ["http://localhost:5173", "http://localhost:3000"]
+if settings.FRONTEND_URL and settings.FRONTEND_URL not in allow_origins:
+    allow_origins.append(settings.FRONTEND_URL)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "https://jarvis-o1jkubrlf-erraasif1.vercel.app",  # Aapka Vercel URL
-        "https://*.vercel.app"  # Tamam Vercel previews ke liye
-    ],
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
