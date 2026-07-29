@@ -1,0 +1,27 @@
+# FastAPI & Server
+fastapi
+uvicorn[standard]
+gunicorn
+pydantic
+
+# Database & Supabase
+supabase
+postgrest
+
+# LLM & Agent Framework (LangGraph / OpenAI)
+openai
+langchain
+langgraph
+langchain-openai
+langchain-core
+
+# Authentication & Security
+python-jose[cryptography]
+passlib[bcrypt]
+cryptography
+cryptography>=3.4.0
+python-dotenv
+
+# HTTP & Utilities
+httpx
+requests
