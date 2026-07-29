@@ -4,6 +4,9 @@ uvicorn[standard]
 gunicorn
 pydantic
 
+# Microsoft Auth (Fixes ModuleNotFoundError)
+msal
+
 # Database & Supabase
 supabase
 postgrest
@@ -19,7 +22,6 @@ langchain-core
 python-jose[cryptography]
 passlib[bcrypt]
 cryptography
-cryptography>=3.4.0
 python-dotenv
 
 # HTTP & Utilities
