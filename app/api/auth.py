@@ -1,5 +1,6 @@
 import msal
 import httpx
+import urllib.parse
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import RedirectResponse
 from app.config import settings
@@ -7,7 +8,8 @@ from app.services.supabase_client import save_user_tokens
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
-SCOPES = ["User.Read", "Mail.ReadWrite", "Calendars.ReadWrite", "Tasks.ReadWrite", "offline_access"]
+# FIX: Removed 'offline_access' because MSAL manages reserved scopes automatically
+SCOPES = ["User.Read", "Mail.ReadWrite", "Calendars.ReadWrite", "Tasks.ReadWrite"]
 
 def get_msal_app():
     return msal.ConfidentialClientApplication(
@@ -52,9 +54,6 @@ def callback(code: str = None, error: str = None):
     # Store encrypted tokens in Supabase
     save_user_tokens(user_email, access_token, refresh_token, expires_in)
 
-    # Every other route (/chat, /emails, /events, /todos) identifies the user by
-    # user_email, not a bearer token, so hand it back to the frontend on redirect
-    # rather than returning bare JSON on the backend domain.
-    import urllib.parse
+    # Redirect user back to frontend with email in param
     redirect_url = f"{settings.FRONTEND_URL}/?user_email={urllib.parse.quote(user_email)}"
     return RedirectResponse(redirect_url)
