@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   MessageSquare, Mail, Calendar, CheckSquare, LogOut,
-  Send, Bot, RefreshCcw, Sparkles, ShieldCheck
+  Send, Bot, RefreshCcw, Sparkles, ShieldCheck, Sun, Moon
 } from "lucide-react";
 import LandingPage from "./LandingPage.jsx";
-import useTheme, { ThemeToggle } from "./ThemeToggle.jsx";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "https://jarvis-backend-h38f.onrender.com";
 
@@ -21,7 +20,34 @@ export default function App() {
   const [inputMessage, setInputMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const chatEndRef = useRef(null);
-  const [isDark, setIsDark] = useTheme();
+
+  // Safe theme initialization to prevent useContext null crashes
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("theme") === "dark" ||
+      (!("theme" in localStorage) && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (isDark) {
+      root.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    } else {
+      root.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    }
+  }, [isDark]);
+
+  const ThemeToggleBtn = () => (
+    <button
+      onClick={() => setIsDark(!isDark)}
+      className="p-2.5 rounded-2xl bg-surface-2 border border-border text-ink hover:text-accent transition-all active:scale-95"
+      title="Toggle Light/Dark Theme"
+    >
+      {isDark ? <Sun size={18} /> : <Moon size={18} />}
+    </button>
+  );
 
   const [messages, setMessages] = useState([
     { sender: "jarvis", text: "Hello! I am Jarvis. Tell me what you'd like to manage across your Outlook Mail, Calendar, or To-Dos." }
@@ -119,7 +145,6 @@ export default function App() {
   return (
     <div className="min-h-screen bg-bg text-ink font-body selection:bg-accent/30 transition-colors duration-300">
       <div className="flex h-screen overflow-hidden">
-
         {/* Sidebar */}
         <aside className="w-80 bg-surface/70 backdrop-blur-2xl border-r border-border/80 p-6 flex flex-col justify-between relative z-20">
           <div>
@@ -132,7 +157,7 @@ export default function App() {
                   Jarvis<span className="text-accent">.</span>
                 </h2>
               </div>
-              <ThemeToggle isDark={isDark} setIsDark={setIsDark} />
+              <ThemeToggleBtn />
             </div>
 
             <nav className="space-y-2">
@@ -182,8 +207,6 @@ export default function App() {
 
         {/* Content Area */}
         <main className="flex-1 flex flex-col h-full bg-bg relative overflow-hidden">
-
-          {/* TAB: CHAT AGENT */}
           {activeTab === "chat" && (
             <div className="flex-1 flex flex-col h-full relative">
               <div className="px-8 py-4 border-b border-border/80 bg-surface/40 backdrop-blur-md flex items-center justify-between z-10">
@@ -233,7 +256,6 @@ export default function App() {
                 <div ref={chatEndRef} />
               </div>
 
-              {/* Floating Input Bar */}
               <div className="absolute bottom-6 left-0 right-0 px-6 max-w-3xl mx-auto w-full z-20">
                 <form
                   onSubmit={handleSendMessage}
@@ -260,11 +282,9 @@ export default function App() {
                   All email actions wait in Outlook as drafts for safety.
                 </div>
               </div>
-
             </div>
           )}
 
-          {/* OTHER TABS */}
           {activeTab !== "chat" && (
             <div className="flex-1 p-8 md:p-12 overflow-y-auto space-y-8 max-w-5xl mx-auto w-full">
               {activeTab === "emails" && (
@@ -326,7 +346,6 @@ export default function App() {
               )}
             </div>
           )}
-
         </main>
       </div>
     </div>
