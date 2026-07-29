@@ -1,15 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   MessageSquare, Mail, Calendar, CheckSquare, LogOut,
-  Send, Bot, RefreshCcw, Sparkles
+  Send, Bot, RefreshCcw, Sparkles, ShieldCheck
 } from "lucide-react";
 import LandingPage from "./LandingPage.jsx";
 import useTheme, { ThemeToggle } from "./ThemeToggle.jsx";
 
-// API Base URL (Deployed backend URL).
-// IMPORTANT: set VITE_API_URL in Vercel's project env vars (and redeploy after
-// setting it — Vite bakes this in at build time). The fallback below is only a
-// safety net for local/staging use.
 const API_BASE_URL = import.meta.env.VITE_API_URL || "https://jarvis-backend-h38f.onrender.com";
 
 const tabs = [
@@ -27,18 +23,13 @@ export default function App() {
   const chatEndRef = useRef(null);
   const [isDark, setIsDark] = useTheme();
 
-  // Data States
   const [messages, setMessages] = useState([
-    { sender: "jarvis", text: "Hello! I am Jarvis. Sign in with Microsoft and tell me what you'd like to do with your mail, calendar, or to-dos." }
+    { sender: "jarvis", text: "Hello! I am Jarvis. Tell me what you'd like to manage across your Outlook Mail, Calendar, or To-Dos." }
   ]);
   const [emails, setEmails] = useState([]);
   const [events, setEvents] = useState([]);
   const [todos, setTodos] = useState([]);
 
-  // Auth & User Management
-  // The backend identifies the signed-in user by user_email (not a bearer
-  // token) — see app/api/auth.py's /callback redirect and every other route's
-  // `user_email: str` param — so that's what we carry through here.
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const userEmail = urlParams.get('user_email');
@@ -46,14 +37,13 @@ export default function App() {
     if (userEmail) {
       localStorage.setItem("jarvis_user_email", userEmail);
       setIsAuthenticated(true);
-      window.history.replaceState({}, document.title, "/"); // Clean URL
+      window.history.replaceState({}, document.title, "/");
     } else {
       const storedEmail = localStorage.getItem("jarvis_user_email");
       if (storedEmail) setIsAuthenticated(true);
     }
   }, []);
 
-  // Fetch Data & Scroll Chat
   useEffect(() => {
     if (isAuthenticated) {
       if (activeTab === "emails") fetchEmails();
@@ -67,8 +57,8 @@ export default function App() {
   const handleLogout = () => { localStorage.removeItem("jarvis_user_email"); setIsAuthenticated(false); };
 
   const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!inputMessage.trim() || !isAuthenticated) return;
+    if (e) e.preventDefault();
+    if (!inputMessage.trim() || !isAuthenticated || loading) return;
 
     const userMsg = inputMessage;
     setMessages((prev) => [...prev, { sender: "user", text: userMsg }]);
@@ -91,13 +81,11 @@ export default function App() {
     }
   };
 
-  // Generic Fetcher
   const fetchData = async (endpoint, setter) => {
     try {
       const userEmail = localStorage.getItem("jarvis_user_email");
       const res = await fetch(`${API_BASE_URL}${endpoint}?user_email=${encodeURIComponent(userEmail)}`);
       const data = await res.json();
-      // /emails and /events return Graph API objects: { value: [...] }
       const list = Array.isArray(data) ? data : Array.isArray(data.value) ? data.value : [];
       setter(list);
     } catch (err) { setter([]); }
@@ -107,16 +95,17 @@ export default function App() {
   const fetchEvents = () => fetchData('/events', setEvents);
   const fetchTodos = () => fetchData('/todos', setTodos);
 
-  // COMMON COMPONENT: Card Wrapper
+  const currentUserEmail = localStorage.getItem("jarvis_user_email") || "User";
+
   const DataCard = ({ title, subtitle, children, icon: Icon }) => (
-    <div className="bg-surface border border-border rounded-3xl p-6 shadow-xl transition">
-      <div className="flex items-center gap-3 mb-5 pb-4 border-b border-border">
-        <div className="p-2.5 bg-surface-2 border border-border rounded-xl text-accent">
-          <Icon size={20} />
+    <div className="bg-surface/80 backdrop-blur-xl border border-border rounded-3xl p-6 md:p-8 shadow-xl transition-all duration-300">
+      <div className="flex items-center gap-3.5 mb-6 pb-5 border-b border-border/80">
+        <div className="p-3 bg-surface-2 border border-border rounded-2xl text-accent shadow-inner">
+          <Icon size={22} />
         </div>
         <div>
-          <h3 className="font-display font-semibold text-ink">{title}</h3>
-          <p className="text-xs text-ink-muted">{subtitle}</p>
+          <h3 className="font-display font-bold text-lg md:text-xl text-ink tracking-tight">{title}</h3>
+          <p className="text-xs md:text-sm text-ink-muted mt-0.5">{subtitle}</p>
         </div>
       </div>
       {children}
@@ -127,117 +116,212 @@ export default function App() {
     return <LandingPage onLogin={handleLogin} isDark={isDark} setIsDark={setIsDark} />;
   }
 
-  // MAIN RENDER (authenticated)
   return (
-    <div className="min-h-screen bg-bg text-ink font-body selection:bg-accent/30">
+    <div className="min-h-screen bg-bg text-ink font-body selection:bg-accent/30 transition-colors duration-300">
       <div className="flex h-screen overflow-hidden">
 
         {/* Sidebar */}
-        <aside className="w-72 bg-surface/70 backdrop-blur-xl border-r border-border p-6 flex flex-col justify-between">
+        <aside className="w-80 bg-surface/70 backdrop-blur-2xl border-r border-border/80 p-6 flex flex-col justify-between relative z-20">
           <div>
-            <div className="flex items-center justify-between mb-10 pb-4 border-b border-border">
-              <div className="flex items-center gap-3.5">
-                <div className="p-2.5 bg-surface-2 border border-border rounded-2xl">
-                  <Sparkles size={20} className="text-accent" />
+            <div className="flex items-center justify-between mb-8 pb-5 border-b border-border/80">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-accent to-purple-500 flex items-center justify-center text-accent-ink font-bold text-xl shadow-lg shadow-accent/20">
+                  J
                 </div>
-                <h2 className="font-display font-bold text-xl tracking-tight text-ink">Jarvis<span className="text-accent">.</span></h2>
+                <h2 className="font-display font-bold text-xl tracking-tight text-ink">
+                  Jarvis<span className="text-accent">.</span>
+                </h2>
               </div>
               <ThemeToggle isDark={isDark} setIsDark={setIsDark} />
             </div>
 
-            <nav className="space-y-2.5">
+            <nav className="space-y-2">
+              <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-ink-muted">
+                Workspace
+              </div>
               {tabs.map(tab => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
                 return (
-                  <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`w-full flex items-center gap-3.5 px-4.5 py-3 rounded-2xl text-sm font-medium transition active:scale-[0.98] ${isActive ? "bg-surface-2 text-ink shadow border border-border" : "text-ink-muted hover:bg-surface-2/60 hover:text-ink"}`}>
-                    <Icon size={19} className={isActive ? "text-accent" : ""} /> {tab.label}
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl text-sm font-semibold transition-all duration-200 active:scale-[0.98] ${
+                      isActive
+                        ? "bg-surface-2 text-ink shadow-md border border-border/90"
+                        : "text-ink-muted hover:bg-surface-2/60 hover:text-ink"
+                    }`}
+                  >
+                    <Icon size={19} className={isActive ? "text-accent" : "opacity-70"} />
+                    <span>{tab.label}</span>
                   </button>
                 );
               })}
             </nav>
           </div>
 
-          <button onClick={handleLogout} className="flex items-center justify-center gap-2.5 px-5 py-3 text-sm text-red-500 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 rounded-xl transition">
-            <LogOut size={17} /> Disconnect Account
-          </button>
+          <div className="pt-4 border-t border-border/80 space-y-3">
+            <div className="flex items-center gap-3 px-2 py-1">
+              <div className="w-9 h-9 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center text-accent font-bold text-sm shrink-0">
+                {currentUserEmail[0].toUpperCase()}
+              </div>
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-[10px] uppercase font-bold text-ink-muted tracking-wider">Connected</span>
+                <span className="text-xs font-medium text-ink truncate">{currentUserEmail}</span>
+              </div>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-red-500 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 rounded-xl transition-all"
+            >
+              <LogOut size={15} /> Disconnect Account
+            </button>
+          </div>
         </aside>
 
         {/* Content Area */}
-        <main className="flex-1 flex flex-col h-full bg-bg">
+        <main className="flex-1 flex flex-col h-full bg-bg relative overflow-hidden">
 
           {/* TAB: CHAT AGENT */}
           {activeTab === "chat" && (
             <div className="flex-1 flex flex-col h-full relative">
-              <div className="flex-1 overflow-y-auto p-10 space-y-7 pb-40">
+              <div className="px-8 py-4 border-b border-border/80 bg-surface/40 backdrop-blur-md flex items-center justify-between z-10">
+                <div className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
+                  <Sparkles size={14} className="text-accent" />
+                  <span>Autonomous Microsoft 365 Copilot</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-[11px] text-emerald-500 font-mono bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live Session
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-6 md:px-12 py-8 space-y-6 pb-36 max-w-4xl mx-auto w-full">
                 {messages.map((msg, index) => (
                   <div key={index} className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}>
-                    <div className={`flex gap-3 max-w-[70%] ${msg.sender === "user" ? "flex-row-reverse" : ""}`}>
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${msg.sender === "jarvis" ? "bg-surface-2 border border-border text-accent" : "bg-accent text-accent-ink"}`}>
-                        {msg.sender === "jarvis" ? <Bot size={18} /> : "U"}
+                    <div className={`flex gap-3.5 max-w-[80%] ${msg.sender === "user" ? "flex-row-reverse" : ""}`}>
+                      <div className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 shadow-md ${
+                        msg.sender === "jarvis"
+                          ? "bg-gradient-to-tr from-accent to-purple-600 text-white"
+                          : "bg-surface-2 border border-border text-ink font-bold text-xs"
+                      }`}>
+                        {msg.sender === "jarvis" ? <Bot size={18} /> : "You"}
                       </div>
-                      <div className={`p-5 rounded-3xl shadow-lg leading-relaxed text-[15px] ${msg.sender === "user" ? "bg-accent text-accent-ink rounded-br-lg" : "bg-surface text-ink border border-border rounded-bl-lg"}`}>
+                      <div className={`p-5 rounded-3xl text-[14.5px] leading-relaxed shadow-sm ${
+                        msg.sender === "user"
+                          ? "bg-accent text-accent-ink rounded-tr-none font-medium"
+                          : "bg-surface text-ink border border-border/80 rounded-tl-none"
+                      }`}>
                         {msg.text}
                       </div>
                     </div>
                   </div>
                 ))}
+
                 {loading && (
                   <div className="flex justify-start">
-                    <div className="flex gap-3">
-                      <div className="w-9 h-9 rounded-full bg-surface-2 border border-border text-accent flex items-center justify-center"><RefreshCcw className="animate-spin" size={17} /></div>
-                      <div className="p-4 bg-surface text-ink-muted border border-border rounded-2xl rounded-bl-lg text-sm">Thinking...</div>
+                    <div className="flex gap-3.5 items-center">
+                      <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-accent to-purple-600 text-white flex items-center justify-center">
+                        <RefreshCcw className="animate-spin" size={17} />
+                      </div>
+                      <div className="p-4 bg-surface text-ink-muted border border-border/80 rounded-2xl rounded-tl-none text-xs font-mono flex items-center gap-2">
+                        <span>Jarvis is thinking...</span>
+                      </div>
                     </div>
                   </div>
                 )}
                 <div ref={chatEndRef} />
               </div>
 
-              {/* Input Area (Float) */}
-              <div className="absolute bottom-6 left-10 right-10">
-                <form onSubmit={handleSendMessage} className="bg-surface/90 backdrop-blur-xl border border-border p-2.5 rounded-full flex gap-3 shadow-2xl focus-within:border-accent transition">
-                  <input type="text" value={inputMessage} onChange={(e) => setInputMessage(e.target.value)} placeholder="Type a request (e.g. 'Draft a reply to Sarah' or 'Move tomorrow's meeting to 3pm')..." className="flex-1 bg-transparent border-none rounded-full px-5 py-3 text-[15px] text-ink focus:outline-none placeholder:text-ink-muted" disabled={loading || !isAuthenticated}/>
-                  <button type="submit" className="bg-accent text-accent-ink w-12 h-12 rounded-full flex items-center justify-center transition disabled:opacity-40 active:scale-95" disabled={loading || !isAuthenticated}>
-                    <Send size={19} />
+              {/* Floating Input Bar */}
+              <div className="absolute bottom-6 left-0 right-0 px-6 max-w-3xl mx-auto w-full z-20">
+                <form
+                  onSubmit={handleSendMessage}
+                  className="bg-surface/90 backdrop-blur-2xl border border-border p-2 rounded-full flex gap-3 shadow-2xl focus-within:border-accent transition-all duration-300"
+                >
+                  <input
+                    type="text"
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    placeholder="Ask Jarvis (e.g. 'Summarize unread emails' or 'Schedule a call tomorrow at 3pm')..."
+                    className="flex-1 bg-transparent border-none rounded-full px-5 py-3 text-sm text-ink focus:outline-none placeholder:text-ink-muted/70"
+                    disabled={loading || !isAuthenticated}
+                  />
+                  <button
+                    type="submit"
+                    className="bg-accent text-accent-ink w-11 h-11 rounded-full flex items-center justify-center hover:opacity-90 transition disabled:opacity-30 active:scale-95 shrink-0 shadow-lg shadow-accent/25"
+                    disabled={loading || !isAuthenticated || !inputMessage.trim()}
+                  >
+                    <Send size={18} />
                   </button>
                 </form>
-                <div className="text-center text-[11px] font-mono text-ink-muted mt-3">Every mail action stays a draft until you send it yourself</div>
+                <div className="text-center text-[11px] font-mono text-ink-muted/80 mt-2.5 flex items-center justify-center gap-1">
+                  <ShieldCheck size={13} className="text-emerald-500" />
+                  All email actions wait in Outlook as drafts for safety.
+                </div>
               </div>
+
             </div>
           )}
 
-          {/* OTHER TABS (Scrollable Data) */}
+          {/* OTHER TABS */}
           {activeTab !== "chat" && (
-            <div className="flex-1 p-10 overflow-y-auto space-y-8">
+            <div className="flex-1 p-8 md:p-12 overflow-y-auto space-y-8 max-w-5xl mx-auto w-full">
               {activeTab === "emails" && (
-                <DataCard title="Email Mailbox" subtitle="Full read/draft access. Emails are created as drafts, never sent." icon={Mail}>
-                  {emails.length === 0 ? <p className="text-ink-muted text-sm italic">No recent emails found.</p> : emails.map(m => (
-                    <div key={m.id} className="bg-surface-2/60 border border-border p-5 rounded-2xl mb-4 last:mb-0">
-                      <div className="flex justify-between items-center mb-2.5"><strong className="text-ink text-base">{m.subject || "(No Subject)"}</strong> <span className="text-xs px-2.5 py-1 bg-amber/10 text-amber border border-amber/30 rounded-full font-medium">Draft Only</span></div>
-                      <p className="text-sm text-ink-muted">{m.bodyPreview}...</p>
-                    </div>
-                  ))}
+                <DataCard title="Outlook Mailbox" subtitle="Live view of your recent emails and pending drafts." icon={Mail}>
+                  {emails.length === 0 ? (
+                    <div className="text-center py-12 text-ink-muted text-sm italic">No recent emails found in Outlook.</div>
+                  ) : (
+                    emails.map(m => (
+                      <div key={m.id} className="bg-surface-2/60 border border-border/80 p-5 rounded-2xl mb-4 last:mb-0 hover:border-accent/30 transition-colors">
+                        <div className="flex justify-between items-center mb-2.5">
+                          <strong className="text-ink text-base font-semibold">{m.subject || "(No Subject)"}</strong>
+                          <span className="text-[11px] px-3 py-1 bg-amber/15 text-amber border border-amber/30 rounded-full font-bold uppercase tracking-wider">Draft</span>
+                        </div>
+                        <p className="text-xs md:text-sm text-ink-muted leading-relaxed line-clamp-2">{m.bodyPreview || "No preview available."}</p>
+                      </div>
+                    ))
+                  )}
                 </DataCard>
               )}
 
               {activeTab === "calendar" && (
-                <DataCard title="Calendar Agenda" subtitle="Full CRUD over events: create, read, update, delete." icon={Calendar}>
-                  {events.length === 0 ? <p className="text-ink-muted text-sm italic">No events found in calendar.</p> : events.map(e => (
-                    <div key={e.id} className="bg-surface-2/60 border border-border p-4 rounded-xl mb-3.5 flex justify-between items-center">
-                      <div><strong className="text-ink">{e.subject}</strong> <p className="text-xs text-ink-muted mt-1">{new Date(e.start?.dateTime).toLocaleString()} - {new Date(e.end?.dateTime).toLocaleString()}</p></div>
-                    </div>
-                  ))}
+                <DataCard title="Calendar Agenda" subtitle="Your upcoming scheduled events." icon={Calendar}>
+                  {events.length === 0 ? (
+                    <div className="text-center py-12 text-ink-muted text-sm italic">No events found in calendar.</div>
+                  ) : (
+                    events.map(e => (
+                      <div key={e.id} className="bg-surface-2/60 border border-border/80 p-5 rounded-2xl mb-3.5 flex justify-between items-center hover:border-accent/30 transition-colors">
+                        <div>
+                          <strong className="text-ink text-base font-semibold block">{e.subject}</strong>
+                          <p className="text-xs text-ink-muted mt-1 font-mono">
+                            {new Date(e.start?.dateTime).toLocaleString()} — {new Date(e.end?.dateTime).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </DataCard>
               )}
 
               {activeTab === "todos" && (
-                <DataCard title="Microsoft To-Do Tasks" subtitle="Full CRUD over tasks (create, read, update, delete)." icon={CheckSquare}>
-                  {todos.length === 0 ? <p className="text-ink-muted text-sm italic">To-Do list is currently empty.</p> : todos.map(t => (
-                    <div key={t.id} className="bg-surface-2/60 border border-border p-4 rounded-xl mb-3.5 flex items-center gap-3">
-                      <div className={`w-5 h-5 rounded-full border-2 ${t.status === 'completed' ? 'bg-accent border-accent' : 'border-border'}`}></div>
-                      <span className={t.status === 'completed' ? 'line-through text-ink-muted' : 'text-ink'}>{t.title}</span>
-                    </div>
-                  ))}
+                <DataCard title="Microsoft To-Do Tasks" subtitle="Active task list from Microsoft To-Do." icon={CheckSquare}>
+                  {todos.length === 0 ? (
+                    <div className="text-center py-12 text-ink-muted text-sm italic">To-Do list is currently empty.</div>
+                  ) : (
+                    todos.map(t => (
+                      <div key={t.id} className="bg-surface-2/60 border border-border/80 p-4 rounded-2xl mb-3 flex items-center gap-3.5 hover:border-accent/30 transition-colors">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                          t.status === 'completed' ? 'bg-accent border-accent text-accent-ink' : 'border-border'
+                        }`}>
+                          {t.status === 'completed' && <span className="text-xs font-bold">✓</span>}
+                        </div>
+                        <span className={`text-sm font-medium ${t.status === 'completed' ? 'line-through text-ink-muted' : 'text-ink'}`}>
+                          {t.title}
+                        </span>
+                      </div>
+                    ))
+                  )}
                 </DataCard>
               )}
             </div>

@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from supabase import create_client, Client
 from cryptography.fernet import Fernet
 from app.config import settings
@@ -13,12 +14,16 @@ def decrypt_token(encrypted_token: str) -> str:
 
 def save_user_tokens(email: str, access_token: str, refresh_token: str, expires_in: int):
     encrypted_access = encrypt_token(access_token)
-    encrypted_refresh = encrypt_token(refresh_token)
+    encrypted_refresh = encrypt_token(refresh_token) if refresh_token else None
+    
+    # Calculate ISO format timestamp for Supabase timestamptz column
+    expires_at = (datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))).isoformat()
     
     data = {
         "email": email,
         "access_token": encrypted_access,
-        "refresh_token": encrypted_refresh
+        "refresh_token": encrypted_refresh,
+        "expires_at": expires_at  # <-- FIX: Added missing expires_at field
     }
     
     # Upsert user record into Supabase

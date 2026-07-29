@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Manual light/dark toggle via a class on <html>, rather than only OS preference */
+/* Manual light/dark toggle via .dark class on <html> element */
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
@@ -8,7 +8,7 @@
   --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
-  /* Deep indigo/violet system instead of a generic blue SaaS palette */
+  /* Custom Color System */
   --color-bg: light-dark(#F6F4F1, #0A0A12);
   --color-surface: light-dark(#FFFFFF, #13131F);
   --color-surface-2: light-dark(#F0EDE7, #191927);
@@ -38,28 +38,53 @@ body {
   background-color: var(--color-bg);
   color: var(--color-ink);
   font-family: var(--font-body);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  overflow-x: hidden;
 }
 
-/* Signature landing animation: three service nodes orbiting the Jarvis mark */
+/* Custom Sleek Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-border);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-ink-muted);
+}
+
+/* Orbit & Core Animations */
 @keyframes orbit-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
 @keyframes orbit-spin-reverse {
   from { transform: rotate(360deg); }
   to { transform: rotate(0deg); }
 }
+
 .orbit-ring {
-  animation: orbit-spin linear infinite;
+  animation: orbit-spin 20s linear infinite;
 }
+
 .orbit-node {
-  animation: orbit-spin-reverse linear infinite;
+  animation: orbit-spin-reverse 20s linear infinite;
 }
 
 @keyframes fade-up {
   from { opacity: 0; transform: translateY(14px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
 .animate-fade-up {
   animation: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -68,6 +93,7 @@ body {
   0%, 100% { opacity: 0.55; }
   50% { opacity: 0.9; }
 }
+
 .animate-glow-pulse {
   animation: glow-pulse 4s ease-in-out infinite;
 }
