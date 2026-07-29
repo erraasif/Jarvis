@@ -3,8 +3,8 @@ import {
   MessageSquare, Mail, Calendar, CheckSquare, LogOut,
   Send, Bot, RefreshCcw, Sparkles
 } from "lucide-react";
-import LandingPage from "./Landingpage.jsx";
-import useTheme, { ThemeToggle } from "./Themetoggle.jsx";
+import LandingPage from "./LandingPage.jsx";
+import useTheme, { ThemeToggle } from "./ThemeToggle.jsx";
 
 // API Base URL (Deployed backend URL).
 // IMPORTANT: set VITE_API_URL in Vercel's project env vars (and redeploy after
