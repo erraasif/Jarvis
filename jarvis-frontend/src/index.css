@@ -98,8 +98,35 @@ body {
   animation: glow-pulse 4s ease-in-out infinite;
 }
 
+.logo-node {
+  animation: node-pulse 2.4s ease-in-out infinite;
+  transform-origin: 11px 25.6px;
+}
+@keyframes node-pulse {
+  0%, 100% { opacity: 0.75; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.35); }
+}
+
+/* Glow that sits BEHIND the text as a soft halo — the letters themselves
+   stay crisp and fully opaque, so it reads as "glowing" without hurting
+   legibility the way a blurred text-shadow directly on the glyph would. */
+.text-glow {
+  text-shadow:
+    0 0 1px currentColor,
+    0 0 18px light-dark(rgba(91,61,245,0.35), rgba(139,124,255,0.55)),
+    0 0 40px light-dark(rgba(91,61,245,0.18), rgba(139,124,255,0.28));
+}
+
+/* For gradient/bg-clip-text headlines: text-shadow can't key off a
+   transparent color, so use a pixel-based drop-shadow glow instead. */
+.text-glow-gradient {
+  filter:
+    drop-shadow(0 0 14px light-dark(rgba(91,61,245,0.35), rgba(139,124,255,0.5)))
+    drop-shadow(0 0 34px light-dark(rgba(91,61,245,0.15), rgba(139,124,255,0.25)));
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .orbit-ring, .orbit-node, .animate-fade-up, .animate-glow-pulse {
+  .orbit-ring, .orbit-node, .animate-fade-up, .animate-glow-pulse, .logo-node {
     animation: none !important;
   }
 }

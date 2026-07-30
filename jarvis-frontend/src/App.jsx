@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   MessageSquare, Mail, Calendar, CheckSquare, LogOut,
-  Send, Bot, RefreshCcw, Sparkles, ShieldCheck, Sun, Moon
+  Send, Bot, RefreshCcw, Sparkles, ShieldCheck, Sun, Moon,
+  Plus, Trash2, X
 } from "lucide-react";
 import LandingPage from "./LandingPage.jsx";
+import Logo from "./Logo.jsx";
 import ProfilePanel, { applyStoredAccent } from "./ProfilePanel.jsx";
 import { motion } from "framer-motion";
 
@@ -145,18 +147,81 @@ export default function App() {
   const fetchEvents = () => fetchData('/events', setEvents);
   const fetchTodos = () => fetchData('/todos', setTodos);
 
+  const currentUserEmailFor = () => localStorage.getItem("jarvis_user_email");
+
+  const [newTodoTitle, setNewTodoTitle] = useState("");
+  const [showEventForm, setShowEventForm] = useState(false);
+  const [newEvent, setNewEvent] = useState({ subject: "", start: "", end: "" });
+
+  const createTodo = async (e) => {
+    e.preventDefault();
+    if (!newTodoTitle.trim()) return;
+    const userEmail = currentUserEmailFor();
+    await fetch(`${API_BASE_URL}/todos?user_email=${encodeURIComponent(userEmail)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: newTodoTitle }),
+    });
+    setNewTodoTitle("");
+    fetchTodos();
+  };
+
+  const toggleTodo = async (task) => {
+    const userEmail = currentUserEmailFor();
+    const nextStatus = task.status === "completed" ? "notStarted" : "completed";
+    await fetch(`${API_BASE_URL}/todos/${task.id}?user_email=${encodeURIComponent(userEmail)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: nextStatus }),
+    });
+    fetchTodos();
+  };
+
+  const deleteTodo = async (taskId) => {
+    const userEmail = currentUserEmailFor();
+    await fetch(`${API_BASE_URL}/todos/${taskId}?user_email=${encodeURIComponent(userEmail)}`, { method: "DELETE" });
+    fetchTodos();
+  };
+
+  const createEvent = async (e) => {
+    e.preventDefault();
+    if (!newEvent.subject || !newEvent.start || !newEvent.end) return;
+    const userEmail = currentUserEmailFor();
+    await fetch(`${API_BASE_URL}/events?user_email=${encodeURIComponent(userEmail)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        subject: newEvent.subject,
+        start: { dateTime: newEvent.start, timeZone: "UTC" },
+        end: { dateTime: newEvent.end, timeZone: "UTC" },
+      }),
+    });
+    setNewEvent({ subject: "", start: "", end: "" });
+    setShowEventForm(false);
+    fetchEvents();
+  };
+
+  const deleteEvent = async (eventId) => {
+    const userEmail = currentUserEmailFor();
+    await fetch(`${API_BASE_URL}/events/${eventId}?user_email=${encodeURIComponent(userEmail)}`, { method: "DELETE" });
+    fetchEvents();
+  };
+
   const currentUserEmail = localStorage.getItem("jarvis_user_email") || "User";
 
-  const DataCard = ({ title, subtitle, children, icon: Icon }) => (
+  const DataCard = ({ title, subtitle, children, icon: Icon, action }) => (
     <div className="bg-surface/80 backdrop-blur-xl border border-border rounded-3xl p-6 md:p-8 shadow-xl transition-all duration-300">
-      <div className="flex items-center gap-3.5 mb-6 pb-5 border-b border-border/80">
-        <div className="p-3 bg-surface-2 border border-border rounded-2xl text-accent shadow-inner">
-          <Icon size={22} />
+      <div className="flex items-center justify-between gap-3.5 mb-6 pb-5 border-b border-border/80">
+        <div className="flex items-center gap-3.5">
+          <div className="p-3 bg-surface-2 border border-border rounded-2xl text-accent shadow-inner">
+            <Icon size={22} />
+          </div>
+          <div>
+            <h3 className="font-display font-bold text-lg md:text-xl text-ink tracking-tight">{title}</h3>
+            <p className="text-xs md:text-sm text-ink-muted mt-0.5">{subtitle}</p>
+          </div>
         </div>
-        <div>
-          <h3 className="font-display font-bold text-lg md:text-xl text-ink tracking-tight">{title}</h3>
-          <p className="text-xs md:text-sm text-ink-muted mt-0.5">{subtitle}</p>
-        </div>
+        {action}
       </div>
       {children}
     </div>
@@ -174,11 +239,9 @@ export default function App() {
           <div>
             <div className="flex items-center justify-between mb-8 pb-5 border-b border-border/80">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-accent to-purple-500 flex items-center justify-center text-accent-ink font-bold text-xl shadow-lg shadow-accent/20">
-                  J
-                </div>
-                <h2 className="font-display font-bold text-xl tracking-tight text-ink">
-                  Jarvis<span className="text-accent">.</span>
+                <Logo size={38} />
+                <h2 className="font-display font-bold text-xl tracking-tight text-ink text-glow">
+                  Jarvis
                 </h2>
               </div>
               <ThemeToggleBtn />
@@ -258,15 +321,15 @@ export default function App() {
               <div className="flex-1 overflow-y-auto px-6 md:px-12 py-8 space-y-6 pb-36 max-w-4xl mx-auto w-full">
                 {messages.map((msg, index) => (
                   <div key={index} className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}>
-                    <div className={`flex gap-3.5 max-w-[80%] ${msg.sender === "user" ? "flex-row-reverse" : ""}`}>
+                    <div className={`flex gap-3.5 max-w-[80%] min-w-0 ${msg.sender === "user" ? "flex-row-reverse" : ""}`}>
                       <div className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 shadow-md ${
                         msg.sender === "jarvis"
-                          ? "bg-gradient-to-tr from-accent to-purple-600 text-white"
+                          ? "bg-linear-to-tr from-accent to-purple-600 text-white"
                           : "bg-surface-2 border border-border text-ink font-bold text-xs"
                       }`}>
                         {msg.sender === "jarvis" ? <Bot size={18} /> : "You"}
                       </div>
-                      <div className={`p-5 rounded-3xl text-[14.5px] leading-relaxed shadow-sm ${
+                      <div className={`p-5 rounded-3xl text-[14.5px] leading-relaxed shadow-sm min-w-0 wrap-break-word whitespace-pre-wrap ${
                         msg.sender === "user"
                           ? "bg-accent text-accent-ink rounded-tr-none font-medium"
                           : "bg-surface text-ink border border-border/80 rounded-tl-none"
@@ -280,7 +343,7 @@ export default function App() {
                 {loading && (
                   <div className="flex justify-start">
                     <div className="flex gap-3.5 items-center">
-                      <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-accent to-purple-600 text-white flex items-center justify-center">
+                      <div className="w-9 h-9 rounded-2xl bg-linear-to-tr from-accent to-purple-600 text-white flex items-center justify-center">
                         <RefreshCcw className="animate-spin" size={17} />
                       </div>
                       <div className="p-4 bg-surface text-ink-muted border border-border/80 rounded-2xl rounded-tl-none text-xs font-mono flex items-center gap-2">
@@ -350,7 +413,50 @@ export default function App() {
               )}
 
               {activeTab === "calendar" && (
-                <DataCard title="Calendar Agenda" subtitle="Your upcoming scheduled events." icon={Calendar}>
+                <DataCard
+                  title="Calendar Agenda"
+                  subtitle="Your upcoming scheduled events."
+                  icon={Calendar}
+                  action={
+                    <button
+                      onClick={() => setShowEventForm((v) => !v)}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-accent bg-accent/10 hover:bg-accent/20 border border-accent/30 px-3.5 py-2 rounded-xl transition shrink-0"
+                    >
+                      {showEventForm ? <X size={14} /> : <Plus size={14} />} {showEventForm ? "Cancel" : "Add Event"}
+                    </button>
+                  }
+                >
+                  {showEventForm && (
+                    <form onSubmit={createEvent} className="bg-surface-2/60 border border-border/80 p-5 rounded-2xl mb-4 space-y-3">
+                      <input
+                        type="text"
+                        placeholder="Event title"
+                        value={newEvent.subject}
+                        onChange={(e) => setNewEvent({ ...newEvent, subject: e.target.value })}
+                        className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-accent"
+                        required
+                      />
+                      <div className="flex gap-3">
+                        <input
+                          type="datetime-local"
+                          value={newEvent.start}
+                          onChange={(e) => setNewEvent({ ...newEvent, start: e.target.value })}
+                          className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-accent"
+                          required
+                        />
+                        <input
+                          type="datetime-local"
+                          value={newEvent.end}
+                          onChange={(e) => setNewEvent({ ...newEvent, end: e.target.value })}
+                          className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-accent"
+                          required
+                        />
+                      </div>
+                      <button type="submit" className="bg-accent text-accent-ink text-sm font-semibold px-5 py-2.5 rounded-xl hover:opacity-90 transition">
+                        Create Event
+                      </button>
+                    </form>
+                  )}
                   {events.length === 0 ? (
                     <div className="text-center py-14 text-ink-muted">
                       <Calendar size={28} className="mx-auto mb-3 opacity-30" />
@@ -370,6 +476,9 @@ export default function App() {
                             {new Date(e.start?.dateTime).toLocaleString()} — {new Date(e.end?.dateTime).toLocaleString()}
                           </p>
                         </div>
+                        <button onClick={() => deleteEvent(e.id)} className="p-2 text-ink-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition shrink-0">
+                          <Trash2 size={16} />
+                        </button>
                       </motion.div>
                     ))
                   )}
@@ -378,6 +487,18 @@ export default function App() {
 
               {activeTab === "todos" && (
                 <DataCard title="Microsoft To-Do Tasks" subtitle="Active task list from Microsoft To-Do." icon={CheckSquare}>
+                  <form onSubmit={createTodo} className="flex gap-3 mb-5">
+                    <input
+                      type="text"
+                      placeholder="Add a new task..."
+                      value={newTodoTitle}
+                      onChange={(e) => setNewTodoTitle(e.target.value)}
+                      className="flex-1 bg-surface-2/60 border border-border/80 rounded-xl px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-accent"
+                    />
+                    <button type="submit" className="flex items-center gap-1.5 bg-accent text-accent-ink text-sm font-semibold px-4 py-2.5 rounded-xl hover:opacity-90 transition shrink-0">
+                      <Plus size={16} /> Add
+                    </button>
+                  </form>
                   {todos.length === 0 ? (
                     <div className="text-center py-14 text-ink-muted">
                       <CheckSquare size={28} className="mx-auto mb-3 opacity-30" />
@@ -391,14 +512,20 @@ export default function App() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.04 }}
                         className="bg-surface-2/60 border border-border/80 p-4 rounded-2xl mb-3 flex items-center gap-3.5 hover:border-accent/30 transition-colors">
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                          t.status === 'completed' ? 'bg-accent border-accent text-accent-ink' : 'border-border'
-                        }`}>
+                        <button
+                          onClick={() => toggleTodo(t)}
+                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                            t.status === 'completed' ? 'bg-accent border-accent text-accent-ink' : 'border-border'
+                          }`}
+                        >
                           {t.status === 'completed' && <span className="text-xs font-bold">✓</span>}
-                        </div>
-                        <span className={`text-sm font-medium ${t.status === 'completed' ? 'line-through text-ink-muted' : 'text-ink'}`}>
+                        </button>
+                        <span className={`text-sm font-medium flex-1 ${t.status === 'completed' ? 'line-through text-ink-muted' : 'text-ink'}`}>
                           {t.title}
                         </span>
+                        <button onClick={() => deleteTodo(t.id)} className="p-2 text-ink-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition shrink-0">
+                          <Trash2 size={16} />
+                        </button>
                       </motion.div>
                     ))
                   )}

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Calendar, CheckSquare, ArrowRight, ShieldCheck, Sparkles } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
+import Logo from './Logo.jsx';
 
 // --- Interactive 3D Canvas Sphere / Core Visual ---
 const Interactive3DCore = () => {
@@ -102,7 +103,7 @@ const Interactive3DCore = () => {
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       style={{ perspective: 900 }}
-      className="relative flex items-center justify-center w-[320px] h-[320px] md:w-[400px] md:h-[400px]"
+      className="relative flex items-center justify-center w-80 h-80 md:w-100 md:h-100"
     >
       <motion.div
         animate={{ rotateX: tilt.x, rotateY: tilt.y }}
@@ -158,20 +159,15 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
     <div className="min-h-screen bg-slate-50 dark:bg-[#07090e] text-slate-900 dark:text-slate-100 transition-colors duration-500 overflow-hidden relative selection:bg-purple-500 selection:text-white">
       
       {/* Background Ambient Glow Gradients */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-gradient-to-b from-purple-500/15 via-indigo-500/10 to-transparent blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-blue-500/10 dark:bg-blue-600/10 blur-[150px] pointer-events-none" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-200 h-125 bg-linear-to-b from-purple-500/15 via-indigo-500/10 to-transparent blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-125 h-125 bg-blue-500/10 dark:bg-blue-600/10 blur-[150px] pointer-events-none" />
 
       {/* Header */}
       <header className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between relative z-30">
         <div className="flex items-center gap-2.5">
-          <div className="relative w-9 h-9 shrink-0">
-            <div className="absolute inset-0 rounded-full border border-accent/50 animate-glow-pulse" />
-            <div className="absolute inset-[3px] rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-white font-display font-bold text-lg shadow-lg shadow-purple-500/25">
-              J
-            </div>
-          </div>
-          <span className="font-display text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-400">
-            Jarvis.
+          <Logo size={38} />
+          <span className="font-display text-xl font-bold tracking-tight text-slate-900 dark:text-white text-glow">
+            Jarvis
           </span>
         </div>
 
@@ -209,7 +205,7 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
           className="font-display text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight max-w-3xl leading-[1.15] mb-6"
         >
           Your inbox, calendar, and to-dos —{' '}
-          <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-600 via-indigo-500 to-blue-500 dark:from-purple-400 dark:via-indigo-300 dark:to-blue-400">
+          <span className="text-glow-gradient bg-clip-text text-transparent bg-linear-to-r from-purple-600 via-indigo-500 to-blue-500 dark:from-purple-400 dark:via-indigo-300 dark:to-blue-400">
             one conversation away.
           </span>
         </motion.h1>
@@ -233,7 +229,7 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
         >
           <button
             onClick={handleLogin}
-            className="group relative inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-lg shadow-xl shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
+            className="group relative inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-lg shadow-xl shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300"
           >
             <span>Sign in with Microsoft</span>
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
