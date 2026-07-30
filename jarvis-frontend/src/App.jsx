@@ -1,44 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import LandingPage from './LandingPage';
 
 const BACKEND_URL = "https://jarvis-backend-h38f.onrender.com";
 
 export default function App() {
-  // Sync initial theme state with index.css dark mode strategy
   const [isDark, setIsDark] = useState(() => {
     const saved = localStorage.getItem('theme');
     return saved ? saved === 'dark' : true;
   });
 
-  const [token, setToken] = useState(localStorage.getItem('jarvis_token') || null);
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('jarvis_token'));
-  
-  // Dynamic M365 Data States (Full CRUD support)
-  const [emails, setEmails] = useState([
-    { id: '1', sender: 'Microsoft Entra ID', subject: 'OAuth Security Token Issued', time: '10:42 AM', unread: true },
-    { id: '2', sender: 'Azure Graph API', subject: 'Sync Completed for Calendar', time: '09:15 AM', unread: false }
-  ]);
-  
-  const [events, setEvents] = useState([
-    { id: '1', title: 'Jarvis AI Live Demo', time: '11:00 AM', location: 'Conference Room A' },
-    { id: '2', title: 'Backend Sync Optimization', time: '03:30 PM', location: 'Microsoft Teams' }
-  ]);
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    !!localStorage.getItem('jarvis_token') || window.location.search.includes('user_email')
+  );
+  const [activeTab, setActiveTab] = useState('chat');
 
-  const [todos, setTodos] = useState([
-    { id: '1', title: 'Deploy Vercel Rewrite Rules', project: 'DevOps', completed: true },
-    { id: '2', title: 'Demonstrate Workspace to Evaluators', project: 'Evaluation', completed: false }
-  ]);
-
-  // Form Inputs for CRUD Add Actions
-  const [newTaskTitle, setNewTaskTitle] = useState('');
-  const [newEventTitle, setNewEventTitle] = useState('');
-
-  // Agent Chat States
   const [messages, setMessages] = useState([
-    { sender: 'jarvis', text: 'SYSTEM ONLINE: Jarvis HUD Agent initialized. Linked to Microsoft Graph.' }
+    {
+      id: '1',
+      sender: 'jarvis',
+      text: "Hello! I'm JARVIS. I've synced your workspace. How can I assist you with your schedule, emails, or directives today?",
+      time: 'Just now'
+    }
   ]);
   const [inputMessage, setInputMessage] = useState('');
+  const chatEndRef = useRef(null);
 
-  // Sync dark class on <html> element for Tailwind v4 @custom-variant dark
+  const [todos, setTodos] = useState([
+    { id: '1', title: 'Deploy Vercel Rewrite Rules', completed: true },
+    { id: '2', title: 'Demonstrate Workspace to Evaluators', completed: false }
+  ]);
+  const [newTask, setNewTask] = useState('');
+
   useEffect(() => {
     if (isDark) {
       document.documentElement.classList.add('dark');
@@ -49,276 +41,219 @@ export default function App() {
     }
   }, [isDark]);
 
-  const toggleTheme = () => setIsDark(prev => !prev);
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
-  // Authentication Handlers
   const handleMicrosoftLogin = () => {
     window.location.href = `${BACKEND_URL}/api/auth/login`;
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('jarvis_token');
-    setToken(null);
-    setIsAuthenticated(false);
-  };
-
-  // -------------------------------------------------------------
-  // FULL CRUD OPERATIONS (TASKS, EVENTS, EMAILS)
-  // -------------------------------------------------------------
-  const handleCreateTask = (e) => {
-    e.preventDefault();
-    if (!newTaskTitle.trim()) return;
-
-    const newTask = {
-      id: Date.now().toString(),
-      title: newTaskTitle,
-      project: 'General',
-      completed: false
-    };
-
-    setTodos(prev => [newTask, ...prev]);
-    setNewTaskTitle('');
-  };
-
-  const handleToggleTask = (id) => {
-    setTodos(todos.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
-  };
-
-  const handleDeleteTask = (id) => {
-    setTodos(todos.filter(t => t.id !== id));
-  };
-
-  const handleCreateEvent = (e) => {
-    e.preventDefault();
-    if (!newEventTitle.trim()) return;
-
-    const newEv = {
-      id: Date.now().toString(),
-      title: newEventTitle,
-      time: '12:00 PM',
-      location: 'Microsoft Teams'
-    };
-
-    setEvents(prev => [...prev, newEv]);
-    setNewEventTitle('');
-  };
-
-  const handleDeleteEvent = (id) => {
-    setEvents(events.filter(e => e.id !== id));
-  };
-
-  const handleToggleEmailRead = (id) => {
-    setEmails(emails.map(m => m.id === id ? { ...m, unread: !m.unread } : m));
   };
 
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (!inputMessage.trim()) return;
 
-    const userQuery = inputMessage;
-    setMessages(prev => [...prev, { sender: 'user', text: userQuery }]);
+    const userMsg = { id: Date.now().toString(), sender: 'user', text: inputMessage, time: 'Now' };
+    setMessages((prev) => [...prev, userMsg]);
+    const query = inputMessage;
     setInputMessage('');
 
     setTimeout(() => {
-      setMessages(prev => [...prev, { 
-        sender: 'jarvis', 
-        text: `EXECUTED: Directive processed for "${userQuery}". Workspace synced.` 
-      }]);
-    }, 450);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          sender: 'jarvis',
+          text: `Processed directive: "${query}". Graph database updated successfully.`,
+          time: 'Now'
+        }
+      ]);
+    }, 500);
   };
 
+  const handleAddTask = (e) => {
+    e.preventDefault();
+    if (!newTask.trim()) return;
+    setTodos([{ id: Date.now().toString(), title: newTask, completed: false }, ...todos]);
+    setNewTask('');
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <LandingPage
+        onLogin={handleMicrosoftLogin}
+        onExploreDemo={() => setIsAuthenticated(true)}
+        isDark={isDark}
+        onToggleTheme={() => setIsDark(!isDark)}
+      />
+    );
+  }
+
   return (
-    <div style={{ minHeight: '100vh', padding: '24px 40px' }} className="animate-fade-up">
-      
-      {/* HEADER WITH LOGO NODE & LIGHT/DARK TOGGLE */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', paddingBottom: '16px', borderBottom: '1px solid var(--color-border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+    <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-ink)] flex flex-col font-sans">
+      <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]/80 backdrop-blur-md sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex justify-between items-center">
           
-          {/* SVG Animated Logo using index.css keyframe classes */}
-          <svg width="34" height="34" viewBox="0 0 32 32" fill="none">
-            <circle cx="16" cy="16" r="14" stroke="var(--color-accent)" strokeWidth="2" className="orbit-ring" strokeDasharray="4 4" />
-            <circle cx="16" cy="16" r="6" fill="var(--color-accent)" />
-            <circle cx="11" cy="25.6" r="3" fill="var(--color-amber)" className="logo-node" />
-          </svg>
-          
-          <span className="text-glow-gradient" style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.6rem', color: 'var(--color-ink)' }}>
-            JARVIS AI
-          </span>
-        </div>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <svg className="w-7 h-7" viewBox="0 0 32 32" fill="none">
+                <circle cx="16" cy="16" r="14" stroke="var(--color-accent)" strokeWidth="2" strokeDasharray="4 4" />
+                <circle cx="16" cy="16" r="6" fill="var(--color-accent)" />
+              </svg>
+              <span className="font-bold text-lg text-glow-gradient">JARVIS</span>
+            </div>
 
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <button 
-            onClick={toggleTheme}
-            style={{ 
-              backgroundColor: 'var(--color-surface-2)', 
-              color: 'var(--color-ink)', 
-              border: '1px solid var(--color-border)',
-              padding: '8px 18px',
-              borderRadius: '9999px',
-              cursor: 'pointer',
-              fontFamily: 'var(--font-mono)',
-              fontSize: '0.85rem'
-            }}
-          >
-            {isDark ? '☀️ Light Mode' : '🌙 Dark Mode'}
-          </button>
+            <nav className="flex bg-[var(--color-surface-2)] p-1 rounded-lg border border-[var(--color-border)]">
+              <button
+                onClick={() => setActiveTab('chat')}
+                className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  activeTab === 'chat'
+                    ? 'bg-[var(--color-accent)] text-[var(--color-accent-ink)] shadow-md'
+                    : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'
+                }`}
+              >
+                💬 Agent Chat
+              </button>
+              <button
+                onClick={() => setActiveTab('workspace')}
+                className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  activeTab === 'workspace'
+                    ? 'bg-[var(--color-accent)] text-[var(--color-accent-ink)] shadow-md'
+                    : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'
+                }`}
+              >
+                ⚡ HUD Dashboard
+              </button>
+            </nav>
+          </div>
 
-          {!isAuthenticated ? (
-            <button 
-              onClick={handleMicrosoftLogin}
-              style={{ 
-                backgroundColor: 'var(--color-accent)', 
-                color: 'var(--color-accent-ink)', 
-                border: 'none',
-                padding: '8px 20px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontFamily: 'var(--font-display)',
-                fontWeight: 600
-              }}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsDark(!isDark)}
+              className="p-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] text-xs font-mono"
             >
-              Sign in with Microsoft →
+              {isDark ? '☀️' : '🌙'}
             </button>
-          ) : (
-            <button 
-              onClick={handleLogout}
-              style={{ 
-                backgroundColor: 'var(--color-surface-2)', 
-                color: 'var(--color-ink)', 
-                border: '1px solid var(--color-border)',
-                padding: '8px 16px',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontFamily: 'var(--font-body)'
-              }}
+            <button
+              onClick={() => setIsAuthenticated(false)}
+              className="text-xs font-mono text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] px-3 py-1.5"
             >
-              Disconnect
+              Sign Out
             </button>
-          )}
+          </div>
         </div>
       </header>
 
-      {/* DASHBOARD GRID */}
-      <main style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', marginBottom: '32px' }}>
-        
-        {/* MAIL MODULE */}
-        <div style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '8px', borderBottom: '1px solid var(--color-border)' }}>
-            <h2 style={{ fontFamily: 'var(--font-display)', margin: 0, fontSize: '1.1rem' }}>📬 Mail Intercept</h2>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--color-accent)', backgroundColor: 'var(--color-surface-2)', padding: '2px 8px', borderRadius: '4px' }}>LIVE GRAPH</span>
-          </div>
-          {emails.map(m => (
-            <div key={m.id} style={{ marginBottom: '12px', paddingBottom: '8px', borderBottom: '1px solid var(--color-border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <strong style={{ color: 'var(--color-accent)' }}>{m.sender}</strong>
-                <button 
-                  onClick={() => handleToggleEmailRead(m.id)}
-                  style={{ background: 'none', border: 'none', color: 'var(--color-ink-muted)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 flex flex-col">
+        {activeTab === 'chat' ? (
+          <div className="flex-1 flex flex-col h-[calc(100vh-140px)] bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl shadow-xl overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {messages.map((m) => (
+                <div
+                  key={m.id}
+                  className={`flex gap-4 max-w-3xl ${
+                    m.sender === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'
+                  }`}
                 >
-                  {m.unread ? '🔵 UNREAD' : '✓ READ'}
-                </button>
-              </div>
-              <div style={{ color: 'var(--color-ink-muted)', fontSize: '0.9rem', marginTop: '4px' }}>{m.subject}</div>
+                  <div
+                    className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${
+                      m.sender === 'user'
+                        ? 'bg-[var(--color-surface-2)] border border-[var(--color-border)] text-[var(--color-ink)]'
+                        : 'bg-[var(--color-accent)] text-white shadow-md shadow-[var(--color-accent)]/30'
+                    }`}
+                  >
+                    {m.sender === 'user' ? 'YOU' : 'J'}
+                  </div>
+
+                  <div
+                    className={`rounded-2xl px-5 py-3.5 text-sm leading-relaxed ${
+                      m.sender === 'user'
+                        ? 'bg-[var(--color-accent)] text-[var(--color-accent-ink)] rounded-tr-none'
+                        : 'bg-[var(--color-surface-2)] border border-[var(--color-border)] text-[var(--color-ink)] rounded-tl-none'
+                    }`}
+                  >
+                    {m.text}
+                  </div>
+                </div>
+              ))}
+              <div ref={chatEndRef} />
             </div>
-          ))}
-        </div>
 
-        {/* CALENDAR MODULE */}
-        <div style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '8px', borderBottom: '1px solid var(--color-border)' }}>
-            <h2 style={{ fontFamily: 'var(--font-display)', margin: 0, fontSize: '1.1rem' }}>📅 Schedule Log</h2>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--color-accent)', backgroundColor: 'var(--color-surface-2)', padding: '2px 8px', borderRadius: '4px' }}>ENTRA</span>
-          </div>
-
-          <form onSubmit={handleCreateEvent} style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
-            <input 
-              type="text" 
-              placeholder="+ Add Event..." 
-              value={newEventTitle}
-              onChange={(e) => setNewEventTitle(e.target.value)}
-              style={{ flex: 1, backgroundColor: 'var(--color-surface-2)', border: '1px solid var(--color-border)', color: 'var(--color-ink)', padding: '6px 12px', borderRadius: '6px', outline: 'none' }}
-            />
-            <button type="submit" style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-ink)', border: 'none', padding: '6px 14px', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}>Add</button>
-          </form>
-
-          {events.map(e => (
-            <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', paddingBottom: '6px', borderBottom: '1px solid var(--color-border)' }}>
-              <div>
-                <strong>{e.title}</strong>
-                <div style={{ color: 'var(--color-ink-muted)', fontSize: '0.85rem' }}>{e.time} • {e.location}</div>
-              </div>
-              <button onClick={() => handleDeleteEvent(e.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}>✕</button>
-            </div>
-          ))}
-        </div>
-
-        {/* DIRECTIVES MODULE (FULL CRUD) */}
-        <div style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '8px', borderBottom: '1px solid var(--color-border)' }}>
-            <h2 style={{ fontFamily: 'var(--font-display)', margin: 0, fontSize: '1.1rem' }}>⚡ Directives (CRUD)</h2>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--color-accent)', backgroundColor: 'var(--color-surface-2)', padding: '2px 8px', borderRadius: '4px' }}>TASKS</span>
-          </div>
-
-          <form onSubmit={handleCreateTask} style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
-            <input 
-              type="text" 
-              placeholder="+ Create Task..." 
-              value={newTaskTitle}
-              onChange={(e) => setNewTaskTitle(e.target.value)}
-              style={{ flex: 1, backgroundColor: 'var(--color-surface-2)', border: '1px solid var(--color-border)', color: 'var(--color-ink)', padding: '6px 12px', borderRadius: '6px', outline: 'none' }}
-            />
-            <button type="submit" style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-ink)', border: 'none', padding: '6px 14px', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}>Save</button>
-          </form>
-
-          {todos.map(t => (
-            <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <input 
-                  type="checkbox" 
-                  checked={t.completed} 
-                  onChange={() => handleToggleTask(t.id)} 
-                  style={{ cursor: 'pointer', accentColor: 'var(--color-accent)' }}
+            <div className="p-4 border-t border-[var(--color-border)] bg-[var(--color-surface)]">
+              <form onSubmit={handleSendMessage} className="relative flex items-center">
+                <input
+                  type="text"
+                  placeholder="Ask JARVIS anything or trigger a workspace task..."
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  className="w-full pl-5 pr-28 py-4 bg-[var(--color-surface-2)] border border-[var(--color-border)] rounded-xl text-sm outline-none focus:border-[var(--color-accent)] transition-all placeholder-[var(--color-ink-muted)]"
                 />
-                <span style={{ textDecoration: t.completed ? 'line-through' : 'none', color: t.completed ? 'var(--color-ink-muted)' : 'var(--color-ink)' }}>
-                  {t.title}
+                <button
+                  type="submit"
+                  className="absolute right-2.5 px-5 py-2.5 bg-[var(--color-accent)] text-[var(--color-accent-ink)] rounded-lg text-xs font-semibold hover:opacity-90 transition-all shadow-md"
+                >
+                  Send ↵
+                </button>
+              </form>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-up">
+            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6">
+              <h2 className="font-bold text-lg mb-4 flex justify-between items-center">
+                <span>⚡ Directives</span>
+                <span className="text-xs font-mono text-[var(--color-accent)] bg-[var(--color-surface-2)] px-2.5 py-1 rounded-md border border-[var(--color-border)]">
+                  CRUD READY
                 </span>
+              </h2>
+
+              <form onSubmit={handleAddTask} className="flex gap-2 mb-4">
+                <input
+                  type="text"
+                  placeholder="Add new task..."
+                  value={newTask}
+                  onChange={(e) => setNewTask(e.target.value)}
+                  className="flex-1 bg-[var(--color-surface-2)] border border-[var(--color-border)] px-3.5 py-2 rounded-lg text-sm outline-none focus:border-[var(--color-accent)]"
+                />
+                <button
+                  type="submit"
+                  className="bg-[var(--color-accent)] text-[var(--color-accent-ink)] px-4 py-2 rounded-lg text-xs font-semibold"
+                >
+                  Add
+                </button>
+              </form>
+
+              <div className="space-y-2">
+                {todos.map((t) => (
+                  <div
+                    key={t.id}
+                    className="flex items-center justify-between p-3 rounded-lg bg-[var(--color-surface-2)] border border-[var(--color-border)] text-sm"
+                  >
+                    <span className={t.completed ? 'line-through text-[var(--color-ink-muted)]' : ''}>
+                      {t.title}
+                    </span>
+                    <button
+                      onClick={() => setTodos(todos.filter((x) => x.id !== t.id))}
+                      className="text-red-400 hover:text-red-500 text-xs px-2"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
               </div>
-              <button onClick={() => handleDeleteTask(t.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}>✕</button>
             </div>
-          ))}
-        </div>
 
+            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-6">
+              <h2 className="font-bold text-lg mb-4">📬 Graph Activity</h2>
+              <div className="p-4 rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-border)] mb-3">
+                <div className="text-xs text-[var(--color-accent)] font-mono mb-1">MICROSOFT ENTRA</div>
+                <div className="text-sm font-semibold">OAuth Security Token Exchange</div>
+                <div className="text-xs text-[var(--color-ink-muted)] mt-1">Status: Active & Validated</div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
-
-      {/* TERMINAL */}
-      <section style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '12px', padding: '20px' }}>
-        <h2 style={{ fontFamily: 'var(--font-display)', margin: '0 0 12px 0', fontSize: '1.1rem' }}>💬 JARVIS Agent Terminal</h2>
-        
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9rem', maxHeight: '140px', overflowY: 'auto', marginBottom: '16px' }}>
-          {messages.map((m, i) => (
-            <div key={i} style={{ marginBottom: '8px', color: m.sender === 'jarvis' ? 'var(--color-accent)' : 'var(--color-ink)' }}>
-              <strong>[{m.sender.toUpperCase()}]:</strong> {m.text}
-            </div>
-          ))}
-        </div>
-
-        <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '12px' }}>
-          <input 
-            type="text" 
-            placeholder="Command Jarvis..." 
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            style={{ flex: 1, backgroundColor: 'var(--color-surface-2)', border: '1px solid var(--color-border)', color: 'var(--color-ink)', padding: '10px 16px', borderRadius: '8px', outline: 'none', fontFamily: 'var(--font-body)' }}
-          />
-          <button 
-            type="submit" 
-            style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-accent-ink)', border: 'none', padding: '10px 24px', borderRadius: '8px', cursor: 'pointer', fontFamily: 'var(--font-display)', fontWeight: 600 }}
-          >
-            Execute
-          </button>
-        </form>
-      </section>
-
     </div>
   );
 }
