@@ -1,101 +1,138 @@
+"""
+Microsoft Graph API Client & Token Management Module
+===================================================
+Handles OAuth2 token validation, MSAL silent token refreshing via Supabase,
+and exposes a generic HTTP wrapper for Microsoft Graph REST v1.0 endpoints.
+"""
+
+import logging
+from datetime import datetime, timezone
 import httpx
-from fastapi import HTTPException
-import os
+import msal
 
-class GraphClient:
-    def __init__(self, access_token: str):
-        self.access_token = access_token
-        self.base_url = "https://graph.microsoft.com/v1.0"
+from app.config import settings
+from app.services.supabase_client import supabase, decrypt_token, save_user_tokens
 
-    async def _headers(self):
-        return {
-            "Authorization": f"Bearer {self.access_token}",
-            "Content-Type": "application/json"
-        }
+logger = logging.getLogger(__name__)
 
-    async def _handle_response(self, response: httpx.Response):
-        if response.status_code >= 400:
-            try:
-                error_data = response.json()
-                msg = error_data.get("error", {}).get("message", "Microsoft Graph API Error")
-            except Exception:
-                msg = response.text or "Unknown error occurred"
-            raise HTTPException(status_code=response.status_code, detail=f"Graph Error: {msg}")
-        
-        if response.status_code == 204:
-            return {"status": "success"}
-        return response.json()
-
-    # --- CALENDAR CRUD OPERATIONS ---
-    async def get_events(self):
-        async with httpx.AsyncClient() as client:
-            res = await client.get(f"{self.base_url}/me/events", headers=await self._headers())
-            return await self._handle_response(res)
-
-    async def create_event(self, event_data: dict):
-        async with httpx.AsyncClient() as client:
-            res = await client.post(f"{self.base_url}/me/events", headers=await self._headers(), json=event_data)
-            return await self._handle_response(res)
-
-    async def update_event(self, event_id: str, event_data: dict):
-        async with httpx.AsyncClient() as client:
-            res = await client.patch(f"{self.base_url}/me/events/{event_id}", headers=await self._headers(), json=event_data)
-            return await self._handle_response(res)
-
-    async def delete_event(self, event_id: str):
-        async with httpx.AsyncClient() as client:
-            res = await client.delete(f"{self.base_url}/me/events/{event_id}", headers=await self._headers())
-            return await self._handle_response(res)
-
-    # --- TO-DO / TASKS CRUD OPERATIONS ---
-    async def get_task_lists(self):
-        async with httpx.AsyncClient() as client:
-            res = await client.get(f"{self.base_url}/me/todo/lists", headers=await self._headers())
-            return await self._handle_response(res)
-
-    async def create_task(self, list_id: str, task_data: dict):
-        async with httpx.AsyncClient() as client:
-            res = await client.post(f"{self.base_url}/me/todo/lists/{list_id}/tasks", headers=await self._headers(), json=task_data)
-            return await self._handle_response(res)
-
-    async def update_task(self, list_id: str, task_id: str, task_data: dict):
-        async with httpx.AsyncClient() as client:
-            res = await client.patch(f"{self.base_url}/me/todo/lists/{list_id}/tasks/{task_id}", headers=await self._headers(), json=task_data)
-            return await self._handle_response(res)
-
-    async def delete_task(self, list_id: str, task_id: str):
-        async with httpx.AsyncClient() as client:
-            res = await client.delete(f"{self.base_url}/me/todo/lists/{list_id}/tasks/{task_id}", headers=await self._headers())
-            return await self._handle_response(res)
+# Pre-configured Microsoft Graph Scopes required by JARVIS agent tools
+GRAPH_SCOPES = [
+    "User.Read",
+    "Mail.ReadWrite",
+    "Calendars.ReadWrite",
+    "Tasks.ReadWrite",
+    "offline_access"
+]
 
 
-# --- COMPATIBILITY HELPER FUNCTION FOR EXISTING ROUTERS ---
-async def graph_request(method: str, endpoint: str, access_token: str, json_data: dict = None):
-    """Fallback helper function required by existing routers (emails.py, etc.)"""
+def get_valid_access_token(user_email: str) -> str:
+    """
+    Retrieves a valid Microsoft Graph Access Token for a given user.
+    Uses stored database access tokens if valid; otherwise, refreshes the token
+    via MSAL Confidential Client using the stored Refresh Token.
+
+    Args:
+        user_email (str): The primary email identifier of the user.
+
+    Returns:
+        str: Decrypted, valid access token ready for Bearer auth header.
+
+    Raises:
+        Exception: If user record is missing or MSAL authentication fails.
+    """
+    res = supabase.table("users").select("*").eq("email", user_email).execute()
+    if not res.data:
+        raise Exception(f"User '{user_email}' not found. Please log in first.")
+
+    user_record = res.data[0]
+    
+    # Check if existing access token is still valid (with a 5-minute buffer)
+    expires_at_str = user_record.get("expires_at")
+    existing_access_token = user_record.get("access_token")
+
+    if expires_at_str and existing_access_token:
+        try:
+            expires_at = datetime.fromisoformat(expires_at_str)
+            # Add 5 minutes buffer to prevent edge-case expiration during request
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+            if datetime.now(timezone.utc).timestamp() + 300 < expires_at.timestamp():
+                return decrypt_token(existing_access_token)
+        except Exception as e:
+            logger.warning(f"Failed to parse stored access token expiration: {e}")
+
+    # Token is expired or missing; perform MSAL Refresh Grant flow
+    logger.info(f"Access token expired or missing for {user_email}. Refreshing token...")
+    refresh_token = decrypt_token(user_record["refresh_token"])
+
+    msal_app = msal.ConfidentialClientApplication(
+        settings.AZURE_CLIENT_ID,
+        client_credential=settings.AZURE_CLIENT_SECRET,
+        authority=f"https://login.microsoftonline.com/{settings.AZURE_TENANT_ID}"
+    )
+
+    result = msal_app.acquire_token_by_refresh_token(refresh_token, scopes=GRAPH_SCOPES)
+
+    if "error" in result:
+        err_msg = result.get("error_description", result.get("error"))
+        logger.error(f"MSAL Refresh Error for {user_email}: {err_msg}")
+        raise Exception(f"Failed to refresh authentication token: {err_msg}")
+
+    new_access_token = result.get("access_token")
+    new_refresh_token = result.get("refresh_token", refresh_token)
+    expires_in = result.get("expires_in", 3600)
+
+    # Persist newly acquired credentials
+    save_user_tokens(user_email, new_access_token, new_refresh_token, expires_in)
+    return new_access_token
+
+
+def graph_request(
+    user_email: str, 
+    method: str, 
+    endpoint: str, 
+    json: dict = None, 
+    params: dict = None
+) -> dict:
+    """
+    Generic HTTP wrapper for making authenticated calls to Microsoft Graph API.
+
+    Args:
+        user_email (str): Target user's account email.
+        method (str): HTTP Method (GET, POST, PATCH, DELETE).
+        endpoint (str): Graph API relative endpoint (e.g., '/me/messages').
+        json (dict, optional): JSON request payload. Defaults to None.
+        params (dict, optional): Query string parameters. Defaults to None.
+
+    Returns:
+        dict: Parsed JSON response payload or status confirmation object.
+
+    Raises:
+        Exception: Surfaced API status errors (HTTP 400+) with Graph error details.
+    """
+    token = get_valid_access_token(user_email)
     url = f"https://graph.microsoft.com/v1.0{endpoint}"
     headers = {
-        "Authorization": f"Bearer {access_token}",
+        "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
-    async with httpx.AsyncClient() as client:
-        if method.upper() == "GET":
-            res = await client.get(url, headers=headers)
-        elif method.upper() == "POST":
-            res = await client.post(url, headers=headers, json=json_data)
-        elif method.upper() == "PATCH":
-            res = await client.patch(url, headers=headers, json=json_data)
-        elif method.upper() == "DELETE":
-            res = await client.delete(url, headers=headers)
-        else:
-            raise HTTPException(status_code=400, detail=f"Unsupported HTTP method: {method}")
 
-        if res.status_code >= 400:
+    with httpx.Client(timeout=30.0) as client:
+        response = client.request(method, url, headers=headers, json=json, params=params)
+
+        # HTTP 204 No Content optimization (common in DELETE/PATCH operations)
+        if response.status_code == 204:
+            return {"status": "success", "code": 204}
+
+        # Raise surface errors on 4xx / 5xx responses for agent tool visibility
+        if response.status_code >= 400:
             try:
-                err_msg = res.json().get("error", {}).get("message", "Graph API Error")
+                detail = response.json()
             except Exception:
-                err_msg = res.text or "Unknown error"
-            raise HTTPException(status_code=res.status_code, detail=f"Graph Error: {err_msg}")
-        
-        if res.status_code == 204:
-            return {"status": "success"}
-        return res.json()
+                detail = response.text
+            
+            logger.error(f"Graph API Error [{response.status_code}] on {endpoint}: {detail}")
+            raise Exception(f"Microsoft Graph API Error ({response.status_code}): {detail}")
+
+        return response.json()

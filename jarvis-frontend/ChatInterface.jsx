@@ -2,12 +2,20 @@ import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Send, Bot, User, Sparkles, Mail, Calendar, CheckSquare, 
-  Plus, LogOut, Sun, Moon, PanelLeft, ArrowUpRight 
+  Plus, LogOut, PanelLeft 
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { ThemeToggle } from "./ThemeToggle";
 
-export default function ChatInterface({ userEmail, onLogout }) {
+const API_BASE_URL = import.meta.env.VITE_API_URL || "https://jarvis-backend-h38f.onrender.com";
+
+/**
+ * ChatInterface Component
+ * =======================
+ * Primary interactive workspace interface for interacting with Jarvis AI Agent.
+ * Features sidebar controls, conversation threads, preset quick prompts, and markdown responses.
+ */
+export default function ChatInterface({ userEmail, onLogout, isDark, setIsDark }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -32,7 +40,7 @@ export default function ChatInterface({ userEmail, onLogout }) {
     setLoading(true);
 
     try {
-      const response = await fetch("https://jarvis-backend-h38f.onrender.com/chat", {
+      const response = await fetch(`${API_BASE_URL}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_email: userEmail, message: query }),
@@ -68,11 +76,11 @@ export default function ChatInterface({ userEmail, onLogout }) {
   return (
     <div className="flex h-screen w-full bg-slate-50 dark:bg-[#080a0f] text-slate-900 dark:text-slate-100 transition-colors duration-300 overflow-hidden">
       
-      {/* Sidebar */}
+      {/* Sidebar Navigation */}
       <motion.aside
         initial={false}
         animate={{ width: sidebarOpen ? "280px" : "0px", opacity: sidebarOpen ? 1 : 0 }}
-        className="h-full bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800/80 flex flex-col z-30 relative overflow-hidden"
+        className="h-full bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800/80 flex flex-col z-30 relative overflow-hidden shrink-0"
       >
         <div className="p-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2">
@@ -83,25 +91,25 @@ export default function ChatInterface({ userEmail, onLogout }) {
           </div>
           <button
             onClick={() => setMessages([])}
-            className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-600 dark:text-slate-400"
+            className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-600 dark:text-slate-400 cursor-pointer"
             title="New Chat"
           >
             <Plus className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Chat History List placeholder */}
+        {/* Chat History Active Session List */}
         <div className="flex-1 p-3 space-y-1 overflow-y-auto">
           <div className="px-3 py-2 text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
             Active Session
           </div>
-          <button className="w-full text-left px-3 py-2.5 rounded-xl bg-purple-500/10 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 font-medium text-sm flex items-center justify-between group">
+          <button className="w-full text-left px-3 py-2.5 rounded-xl bg-purple-500/10 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 font-medium text-sm flex items-center justify-between group cursor-pointer">
             <span className="truncate">Current Workspace Chat</span>
             <Sparkles className="w-4 h-4 opacity-70" />
           </button>
         </div>
 
-        {/* User Footer */}
+        {/* Account User Profile Footer */}
         <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="w-9 h-9 rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold shrink-0">
@@ -114,7 +122,7 @@ export default function ChatInterface({ userEmail, onLogout }) {
           </div>
           <button
             onClick={onLogout}
-            className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+            className="p-2 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
             title="Sign Out"
           >
             <LogOut className="w-5 h-5" />
@@ -122,15 +130,16 @@ export default function ChatInterface({ userEmail, onLogout }) {
         </div>
       </motion.aside>
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col h-full relative">
+      {/* Main Workspace Area */}
+      <div className="flex-1 flex flex-col h-full relative min-w-0">
         
-        {/* Top Header */}
+        {/* Top Header Toolbar */}
         <header className="h-16 px-6 flex items-center justify-between border-b border-slate-200 dark:border-slate-800/80 bg-white/40 dark:bg-slate-900/30 backdrop-blur-md z-20">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 rounded-xl hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-colors"
+              className="p-2 rounded-xl hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+              title="Toggle Sidebar"
             >
               <PanelLeft className="w-5 h-5 text-slate-600 dark:text-slate-300" />
             </button>
@@ -138,10 +147,10 @@ export default function ChatInterface({ userEmail, onLogout }) {
               Microsoft 365 Copilot Mode
             </span>
           </div>
-          <ThemeToggle />
+          <ThemeToggle isDark={isDark} setIsDark={setIsDark} />
         </header>
 
-        {/* Messages / Welcome View */}
+        {/* Messages Feed or Empty State */}
         <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6 max-w-4xl mx-auto w-full">
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center my-auto">
@@ -155,13 +164,13 @@ export default function ChatInterface({ userEmail, onLogout }) {
                 I can manage your Microsoft Outlook inbox, schedule calendar events, and organize your tasks seamlessly.
               </p>
 
-              {/* Suggestions Grid */}
+              {/* Suggestions Cards Grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full max-w-2xl">
                 {suggestions.map((item, idx) => (
                   <button
                     key={idx}
                     onClick={() => handleSend(item.query)}
-                    className="p-4 rounded-2xl bg-white/60 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 hover:border-purple-500/50 dark:hover:border-purple-500/50 text-left transition-all duration-300 group shadow-sm hover:shadow-md"
+                    className="p-4 rounded-2xl bg-white/60 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 hover:border-purple-500/50 dark:hover:border-purple-500/50 text-left transition-all duration-300 group shadow-sm hover:shadow-md cursor-pointer"
                   >
                     <item.icon className="w-5 h-5 text-purple-600 dark:text-purple-400 mb-3 group-hover:scale-110 transition-transform" />
                     <span className="text-xs font-semibold text-slate-400 block mb-1">
@@ -224,7 +233,7 @@ export default function ChatInterface({ userEmail, onLogout }) {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Floating Glass Input Area */}
+        {/* Input Bar Section */}
         <div className="p-4 md:p-6 max-w-4xl mx-auto w-full">
           <form
             onSubmit={(e) => {
@@ -243,7 +252,7 @@ export default function ChatInterface({ userEmail, onLogout }) {
             <button
               type="submit"
               disabled={!input.trim() || loading}
-              className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:opacity-90 disabled:opacity-40 disabled:hover:opacity-40 transition-all shadow-md shadow-purple-500/20"
+              className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:opacity-90 disabled:opacity-40 disabled:hover:opacity-40 transition-all shadow-md shadow-purple-500/20 cursor-pointer"
             >
               <Send className="w-4 h-4" />
             </button>

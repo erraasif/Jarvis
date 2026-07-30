@@ -1,100 +1,317 @@
-import React from 'react';
+/**
+ * Landing Page Component
+ * =======================
+ * Serves as the primary public landing page for JARVIS.
+ * Displays interactive 3D particle visualizer, Microsoft Entra ID authentication CTA,
+ * and service feature overview cards.
+ */
 
-export default function LandingPage({ onLogin, onExploreDemo, isDark, onToggleTheme }) {
+import React, { useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
+import { Mail, Calendar, CheckSquare, ArrowRight, ShieldCheck, Sparkles } from 'lucide-react';
+import { ThemeToggle } from './ThemeToggle';
+import Logo from './Logo.jsx';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || "https://jarvis-backend-h38f.onrender.com";
+
+/**
+ * Interactive 3D Canvas Sphere / Core Visual
+ * Renders a rotating 3D particle sphere responding to cursor tilt vectors.
+ */
+const Interactive3DCore = () => {
+  const canvasRef = useRef(null);
+  const wrapperRef = useRef(null);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+
+  const handleMouseMove = (e) => {
+    if (!wrapperRef.current) return;
+    const rect = wrapperRef.current.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width - 0.5;
+    const py = (e.clientY - rect.top) / rect.height - 0.5;
+    setTilt({ x: py * -14, y: px * 14 });
+  };
+
+  const handleMouseLeave = () => setTilt({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animationFrameId;
+
+    // Support Crisp High-DPI Canvas Rendering
+    const dpr = window.devicePixelRatio || 1;
+    const displaySize = 400;
+    canvas.width = displaySize * dpr;
+    canvas.height = displaySize * dpr;
+    ctx.scale(dpr, dpr);
+
+    const width = displaySize;
+    const height = displaySize;
+
+    const particles = [];
+    const numParticles = 120;
+    const radius = 110;
+
+    // Initialize 3D Spherical Particle Coordinates
+    for (let i = 0; i < numParticles; i++) {
+      const theta = Math.acos(2 * Math.random() - 1);
+      const phi = 2 * Math.PI * Math.random();
+      particles.push({
+        x: radius * Math.sin(theta) * Math.cos(phi),
+        y: radius * Math.sin(theta) * Math.sin(phi),
+        z: radius * Math.cos(theta),
+      });
+    }
+
+    const angleX = 0.005;
+    const angleY = 0.008;
+
+    const render = () => {
+      ctx.clearRect(0, 0, width, height);
+      const centerX = width / 2;
+      const centerY = height / 2;
+
+      // Rotate Particles in 3D Space
+      particles.forEach((p) => {
+        // Rotate around Y axis
+        const x1 = p.x * Math.cos(angleY) - p.z * Math.sin(angleY);
+        const z1 = p.z * Math.cos(angleY) + p.x * Math.sin(angleY);
+
+        // Rotate around X axis
+        const y1 = p.y * Math.cos(angleX) - z1 * Math.sin(angleX);
+        const z2 = z1 * Math.cos(angleX) + p.y * Math.sin(angleX);
+
+        p.x = x1;
+        p.y = y1;
+        p.z = z2;
+
+        // Perspective projection calculation
+        const scale = 300 / (300 + p.z);
+        const projX = p.x * scale + centerX;
+        const projY = p.y * scale + centerY;
+        const alpha = (p.z + radius) / (2 * radius);
+
+        ctx.beginPath();
+        ctx.arc(projX, projY, Math.max(1, 2.5 * scale), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(147, 51, 234, ${Math.max(0.2, alpha)})`;
+        ctx.fill();
+      });
+
+      // Draw Radial Glowing Core Center
+      const gradient = ctx.createRadialGradient(centerX, centerY, 10, centerX, centerY, 90);
+      gradient.addColorStop(0, 'rgba(168, 85, 247, 0.4)');
+      gradient.addColorStop(0.5, 'rgba(99, 102, 241, 0.15)');
+      gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 90, 0, Math.PI * 2);
+      ctx.fill();
+
+      animationFrameId = requestAnimationFrame(render);
+    };
+
+    render();
+
+    return () => cancelAnimationFrame(animationFrameId);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-ink)] flex flex-col font-[var(--font-body)] transition-colors duration-300">
-      
-      {/* NAVBAR */}
-      <header className="w-full max-w-7xl mx-auto px-6 py-6 flex justify-between items-center border-b border-[var(--color-border)]/40">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-[var(--color-accent)] flex items-center justify-center text-[var(--color-accent-ink)] font-bold font-[var(--font-display)] text-base shadow-lg shadow-[var(--color-accent)]/30">
-            J
-          </div>
-          <span className="font-[var(--font-display)] text-2xl font-extrabold tracking-tight text-glow-gradient">
-            JARVIS AI
+    <div
+      ref={wrapperRef}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      style={{ perspective: 900 }}
+      className="relative flex items-center justify-center w-80 h-80 md:w-100 md:h-100"
+    >
+      <motion.div
+        animate={{ rotateX: tilt.x, rotateY: tilt.y }}
+        transition={{ type: "spring", stiffness: 120, damping: 14 }}
+        style={{ transformStyle: "preserve-3d" }}
+        className="relative w-full h-full flex items-center justify-center"
+      >
+        {/* Outer Pulse Rings */}
+        <div className="absolute inset-0 rounded-full border border-purple-500/20 dark:border-purple-500/30 animate-ping opacity-20 pointer-events-none" />
+        <div className="absolute inset-8 rounded-full border border-indigo-500/30 dark:border-indigo-400/20 blur-[1px]" />
+
+        {/* 3D Particle Canvas */}
+        <canvas ref={canvasRef} className="relative z-10 w-[400px] h-[400px]" />
+
+        {/* Floating Action Badges */}
+        <motion.div
+          animate={{ y: [0, -8, 0] }}
+          transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+          style={{ transform: "translateZ(60px)" }}
+          className="absolute top-6 right-6 z-20 p-3 rounded-2xl bg-white/70 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200 dark:border-slate-800 shadow-xl text-purple-600 dark:text-purple-400"
+        >
+          <Mail className="w-5 h-5" />
+        </motion.div>
+
+        <motion.div
+          animate={{ y: [0, 8, 0] }}
+          transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
+          style={{ transform: "translateZ(60px)" }}
+          className="absolute bottom-10 left-4 z-20 p-3 rounded-2xl bg-white/70 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200 dark:border-slate-800 shadow-xl text-indigo-600 dark:text-indigo-400"
+        >
+          <Calendar className="w-5 h-5" />
+        </motion.div>
+
+        <motion.div
+          animate={{ y: [0, -6, 0] }}
+          transition={{ repeat: Infinity, duration: 3.5, ease: "easeInOut" }}
+          style={{ transform: "translateZ(60px)" }}
+          className="absolute top-1/2 left-0 -translate-y-1/2 z-20 p-3 rounded-2xl bg-white/70 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200 dark:border-slate-800 shadow-xl text-emerald-600 dark:text-emerald-400"
+        >
+          <CheckSquare className="w-5 h-5" />
+        </motion.div>
+      </motion.div>
+    </div>
+  );
+};
+
+export default function LandingPage({ onLogin, isDark, setIsDark }) {
+  const handleLogin = onLogin || (() => {
+    window.location.href = `${API_BASE_URL}/api/auth/login`;
+  });
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-[#07090e] text-slate-900 dark:text-slate-100 transition-colors duration-500 overflow-hidden relative selection:bg-purple-500 selection:text-white">
+      {/* Background Ambient Glow Gradients */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-200 h-125 bg-linear-to-b from-purple-500/15 via-indigo-500/10 to-transparent blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-0 right-0 w-125 h-125 bg-blue-500/10 dark:bg-blue-600/10 blur-[150px] pointer-events-none" />
+
+      {/* Header */}
+      <header className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between relative z-30">
+        <div className="flex items-center gap-2.5">
+          <Logo size={38} />
+          <span className="font-display text-xl font-bold tracking-tight text-slate-900 dark:text-white text-glow">
+            Jarvis
           </span>
         </div>
 
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onToggleTheme}
-            className="px-4 py-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-xs font-[var(--font-mono)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:border-[var(--color-accent)] transition-all cursor-pointer"
-          >
-            {isDark ? '☀️ Light HUD' : '🌙 Cyber Dark'}
-          </button>
-          
-          <button
-            onClick={onLogin}
-            className="hidden sm:inline-flex px-5 py-2.5 rounded-xl bg-[var(--color-accent)] text-[var(--color-accent-ink)] font-semibold font-[var(--font-display)] text-sm hover:opacity-90 transition-all shadow-md shadow-[var(--color-accent)]/20 cursor-pointer"
-          >
-            Sign in
-          </button>
-        </div>
+        <ThemeToggle isDark={isDark} setIsDark={setIsDark} />
       </header>
 
-      {/* HERO SECTION */}
-      <main className="flex-1 flex flex-col items-center justify-center px-6 text-center max-w-5xl mx-auto my-12 animate-fade-up">
-        <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-xs font-[var(--font-mono)] text-[var(--color-accent)] mb-8 shadow-sm">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-          Microsoft 365 Autonomous Agent • Graph API Integrated
-        </div>
+      {/* Hero Section */}
+      <main className="max-w-6xl mx-auto px-6 pt-8 pb-20 relative z-20 flex flex-col items-center text-center">
+        {/* Badge */}
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="font-mono inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-500/10 dark:bg-purple-400/10 border border-purple-500/20 text-purple-700 dark:text-purple-300 text-xs font-semibold uppercase tracking-widest mb-8 backdrop-blur-md"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          Personal Agent for Microsoft 365
+        </motion.div>
 
-        <h1 className="text-5xl sm:text-7xl font-black font-[var(--font-display)] tracking-tight mb-8 leading-[1.1]">
-          Your inbox, calendar & tasks <br />
-          <span className="text-glow-gradient">one conversation away.</span>
-        </h1>
+        {/* 3D Core Visual */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.8 }}
+          className="mb-8"
+        >
+          <Interactive3DCore />
+        </motion.div>
 
-        <p className="text-lg sm:text-xl text-[var(--color-ink-muted)] max-w-2xl mb-12 leading-relaxed">
-          Tell JARVIS what you need. It reasons over your requests and acts directly on Outlook, Calendar, and To Do with complete accuracy.
-        </p>
+        {/* Main Heading */}
+        <motion.h1
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="font-display text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight max-w-3xl leading-[1.15] mb-6"
+        >
+          Your inbox, calendar, and to-dos —{' '}
+          <span className="text-glow-gradient bg-clip-text text-transparent bg-linear-to-r from-purple-600 via-indigo-500 to-blue-500 dark:from-purple-400 dark:via-indigo-300 dark:to-blue-400">
+            one conversation away.
+          </span>
+        </motion.h1>
 
-        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto items-center">
+        {/* Subtitle */}
+        <motion.p
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="text-lg md:text-xl text-slate-600 dark:text-slate-400 max-w-2xl font-normal leading-relaxed mb-10"
+        >
+          Tell Jarvis what you need. It reasons over your requests and acts directly on Outlook, Calendar, and To Do with complete accuracy.
+        </motion.p>
+
+        {/* Primary CTA */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="flex flex-col items-center gap-3"
+        >
           <button
-            onClick={onLogin}
-            className="w-full sm:w-auto px-9 py-4 rounded-xl bg-[var(--color-accent)] text-[var(--color-accent-ink)] font-bold font-[var(--font-display)] text-base hover:opacity-95 transform hover:-translate-y-0.5 transition-all shadow-xl shadow-[var(--color-accent)]/25 cursor-pointer flex items-center justify-center gap-2"
+            onClick={handleLogin}
+            className="group relative inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-lg shadow-xl shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer"
           >
-            Sign in with Microsoft →
+            <span>Sign in with Microsoft</span>
+            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </button>
-          
-          <button
-            onClick={onExploreDemo}
-            className="w-full sm:w-auto px-8 py-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] font-semibold font-[var(--font-display)] text-base hover:bg-[var(--color-surface-2)] transition-all cursor-pointer text-[var(--color-ink)]"
-          >
-            Explore Interactive Demo
-          </button>
-        </div>
 
-        {/* CARDS */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full mt-20 text-left">
-          <div className="p-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm hover:border-[var(--color-accent)]/50 transition-all">
-            <div className="text-2xl mb-3">⚡</div>
-            <h3 className="font-[var(--font-display)] font-bold text-lg mb-2">Instant Directives</h3>
-            <p className="text-sm text-[var(--color-ink-muted)] leading-relaxed">
-              Create, complete, and delete Microsoft To Do tasks straight from natural language prompts.
+          <span className="font-mono flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-500 font-medium">
+            <ShieldCheck className="w-4 h-4 text-emerald-500" />
+            Authenticated via Microsoft Entra ID
+          </span>
+        </motion.div>
+
+        {/* Feature Cards Grid */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl mt-20"
+        >
+          {/* Card 1 */}
+          <div className="group p-8 rounded-3xl bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800/80 hover:border-purple-500/40 dark:hover:border-purple-500/40 transition-all duration-300 text-left hover:-translate-y-1.5 shadow-xl shadow-slate-200/50 dark:shadow-none">
+            <div className="w-12 h-12 rounded-2xl bg-purple-500/10 dark:bg-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400 mb-6 group-hover:scale-110 transition-transform">
+              <Mail className="w-6 h-6" />
+            </div>
+            <span className="font-mono text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 mb-2 block">
+              Mailbox
+            </span>
+            <h3 className="font-display text-xl font-bold mb-2">Reads, never sends without you</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+              Ask Jarvis to summarize your inbox or draft a reply. Every draft waits in Outlook for your review.
             </p>
           </div>
 
-          <div className="p-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm hover:border-[var(--color-accent)]/50 transition-all">
-            <div className="text-2xl mb-3">📬</div>
-            <h3 className="font-[var(--font-display)] font-bold text-lg mb-2">Mail Intercept</h3>
-            <p className="text-sm text-[var(--color-ink-muted)] leading-relaxed">
-              Summarize unread emails, compose responses, and flag high-priority messages automatically.
+          {/* Card 2 */}
+          <div className="group p-8 rounded-3xl bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800/80 hover:border-indigo-500/40 dark:hover:border-indigo-500/40 transition-all duration-300 text-left hover:-translate-y-1.5 shadow-xl shadow-slate-200/50 dark:shadow-none">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-6 group-hover:scale-110 transition-transform">
+              <Calendar className="w-6 h-6" />
+            </div>
+            <span className="font-mono text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-2 block">
+              Calendar
+            </span>
+            <h3 className="font-display text-xl font-bold mb-2">Full control over schedule</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+              Create, reschedule, or cancel events by describing them in plain conversational language.
             </p>
           </div>
 
-          <div className="p-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm hover:border-[var(--color-accent)]/50 transition-all">
-            <div className="text-2xl mb-3">📅</div>
-            <h3 className="font-[var(--font-display)] font-bold text-lg mb-2">Smart Calendar</h3>
-            <p className="text-sm text-[var(--color-ink-muted)] leading-relaxed">
-              Schedule meetings, check free slots, and manage conflict resolutions seamlessly.
+          {/* Card 3 */}
+          <div className="group p-8 rounded-3xl bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800/80 hover:border-emerald-500/40 dark:hover:border-emerald-500/40 transition-all duration-300 text-left hover:-translate-y-1.5 shadow-xl shadow-slate-200/50 dark:shadow-none">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-6 group-hover:scale-110 transition-transform">
+              <CheckSquare className="w-6 h-6" />
+            </div>
+            <span className="font-mono text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2 block">
+              Tasks
+            </span>
+            <h3 className="font-display text-xl font-bold mb-2">Your Microsoft To Do, spoken</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+              Add, complete, or reorganize tasks in a single sentence without filling out manual forms.
             </p>
           </div>
-        </div>
+        </motion.div>
       </main>
-
-      <footer className="w-full max-w-7xl mx-auto px-6 py-6 border-t border-[var(--color-border)]/40 text-center text-xs font-[var(--font-mono)] text-[var(--color-ink-muted)]">
-        Authenticated via Microsoft Entra ID • Secure Token Storage
-      </footer>
     </div>
   );
 }
