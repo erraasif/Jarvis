@@ -3,6 +3,7 @@ fastapi
 uvicorn[standard]
 gunicorn
 pydantic
+email-validator
 
 # Microsoft Auth (Fixes ModuleNotFoundError)
 msal
