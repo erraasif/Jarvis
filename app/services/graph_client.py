@@ -67,3 +67,35 @@ class GraphClient:
         async with httpx.AsyncClient() as client:
             res = await client.delete(f"{self.base_url}/me/todo/lists/{list_id}/tasks/{task_id}", headers=await self._headers())
             return await self._handle_response(res)
+
+
+# --- COMPATIBILITY HELPER FUNCTION FOR EXISTING ROUTERS ---
+async def graph_request(method: str, endpoint: str, access_token: str, json_data: dict = None):
+    """Fallback helper function required by existing routers (emails.py, etc.)"""
+    url = f"https://graph.microsoft.com/v1.0{endpoint}"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+    async with httpx.AsyncClient() as client:
+        if method.upper() == "GET":
+            res = await client.get(url, headers=headers)
+        elif method.upper() == "POST":
+            res = await client.post(url, headers=headers, json=json_data)
+        elif method.upper() == "PATCH":
+            res = await client.patch(url, headers=headers, json=json_data)
+        elif method.upper() == "DELETE":
+            res = await client.delete(url, headers=headers)
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported HTTP method: {method}")
+
+        if res.status_code >= 400:
+            try:
+                err_msg = res.json().get("error", {}).get("message", "Graph API Error")
+            except Exception:
+                err_msg = res.text or "Unknown error"
+            raise HTTPException(status_code=res.status_code, detail=f"Graph Error: {err_msg}")
+        
+        if res.status_code == 204:
+            return {"status": "success"}
+        return res.json()
