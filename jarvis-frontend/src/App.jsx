@@ -4,6 +4,8 @@ import {
   Send, Bot, RefreshCcw, Sparkles, ShieldCheck, Sun, Moon
 } from "lucide-react";
 import LandingPage from "./LandingPage.jsx";
+import ProfilePanel, { applyStoredAccent } from "./ProfilePanel.jsx";
+import { motion } from "framer-motion";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "https://jarvis-backend-h38f.onrender.com";
 
@@ -49,6 +51,12 @@ export default function App() {
     </button>
   );
 
+  useEffect(() => {
+    applyStoredAccent();
+  }, []);
+
+  const [showProfile, setShowProfile] = useState(false);
+
   const [messages, setMessages] = useState([
     { sender: "jarvis", text: "Hello! I am Jarvis. Tell me what you'd like to manage across your Outlook Mail, Calendar, or To-Dos." }
   ]);
@@ -69,6 +77,22 @@ export default function App() {
       if (storedEmail) setIsAuthenticated(true);
     }
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      const userEmail = localStorage.getItem("jarvis_user_email");
+      fetch(`${API_BASE_URL}/chat/history?user_email=${encodeURIComponent(userEmail)}`)
+        .then((res) => res.json())
+        .then((data) => {
+          const past = (data.history || []).map((h) => ({
+            sender: h.role === "user" ? "user" : "jarvis",
+            text: h.content,
+          }));
+          if (past.length > 0) setMessages(past);
+        })
+        .catch(() => {}); // history is a nice-to-have; don't block the UI if it fails
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -185,8 +209,20 @@ export default function App() {
             </nav>
           </div>
 
-          <div className="pt-4 border-t border-border/80 space-y-3">
-            <div className="flex items-center gap-3 px-2 py-1">
+          <div className="pt-4 border-t border-border/80 space-y-3 relative">
+            {showProfile && (
+              <ProfilePanel
+                email={currentUserEmail}
+                isDark={isDark}
+                setIsDark={setIsDark}
+                onLogout={handleLogout}
+                onClose={() => setShowProfile(false)}
+              />
+            )}
+            <button
+              onClick={() => setShowProfile((v) => !v)}
+              className="w-full flex items-center gap-3 px-2 py-1.5 rounded-xl hover:bg-surface-2/60 transition text-left"
+            >
               <div className="w-9 h-9 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center text-accent font-bold text-sm shrink-0">
                 {currentUserEmail[0].toUpperCase()}
               </div>
@@ -194,7 +230,7 @@ export default function App() {
                 <span className="text-[10px] uppercase font-bold text-ink-muted tracking-wider">Connected</span>
                 <span className="text-xs font-medium text-ink truncate">{currentUserEmail}</span>
               </div>
-            </div>
+            </button>
 
             <button
               onClick={handleLogout}
@@ -290,16 +326,24 @@ export default function App() {
               {activeTab === "emails" && (
                 <DataCard title="Outlook Mailbox" subtitle="Live view of your recent emails and pending drafts." icon={Mail}>
                   {emails.length === 0 ? (
-                    <div className="text-center py-12 text-ink-muted text-sm italic">No recent emails found in Outlook.</div>
+                    <div className="text-center py-14 text-ink-muted">
+                      <Mail size={28} className="mx-auto mb-3 opacity-30" />
+                      <p className="text-sm italic">No recent emails found in Outlook.</p>
+                    </div>
                   ) : (
-                    emails.map(m => (
-                      <div key={m.id} className="bg-surface-2/60 border border-border/80 p-5 rounded-2xl mb-4 last:mb-0 hover:border-accent/30 transition-colors">
+                    emails.map((m, i) => (
+                      <motion.div
+                        key={m.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.04 }}
+                        className="bg-surface-2/60 border border-border/80 p-5 rounded-2xl mb-4 last:mb-0 hover:border-accent/30 transition-colors">
                         <div className="flex justify-between items-center mb-2.5">
                           <strong className="text-ink text-base font-semibold">{m.subject || "(No Subject)"}</strong>
                           <span className="text-[11px] px-3 py-1 bg-amber/15 text-amber border border-amber/30 rounded-full font-bold uppercase tracking-wider">Draft</span>
                         </div>
                         <p className="text-xs md:text-sm text-ink-muted leading-relaxed line-clamp-2">{m.bodyPreview || "No preview available."}</p>
-                      </div>
+                      </motion.div>
                     ))
                   )}
                 </DataCard>
@@ -308,17 +352,25 @@ export default function App() {
               {activeTab === "calendar" && (
                 <DataCard title="Calendar Agenda" subtitle="Your upcoming scheduled events." icon={Calendar}>
                   {events.length === 0 ? (
-                    <div className="text-center py-12 text-ink-muted text-sm italic">No events found in calendar.</div>
+                    <div className="text-center py-14 text-ink-muted">
+                      <Calendar size={28} className="mx-auto mb-3 opacity-30" />
+                      <p className="text-sm italic">No events found in calendar.</p>
+                    </div>
                   ) : (
-                    events.map(e => (
-                      <div key={e.id} className="bg-surface-2/60 border border-border/80 p-5 rounded-2xl mb-3.5 flex justify-between items-center hover:border-accent/30 transition-colors">
+                    events.map((e, i) => (
+                      <motion.div
+                        key={e.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.04 }}
+                        className="bg-surface-2/60 border border-border/80 p-5 rounded-2xl mb-3.5 flex justify-between items-center hover:border-accent/30 transition-colors">
                         <div>
                           <strong className="text-ink text-base font-semibold block">{e.subject}</strong>
                           <p className="text-xs text-ink-muted mt-1 font-mono">
                             {new Date(e.start?.dateTime).toLocaleString()} — {new Date(e.end?.dateTime).toLocaleString()}
                           </p>
                         </div>
-                      </div>
+                      </motion.div>
                     ))
                   )}
                 </DataCard>
@@ -327,10 +379,18 @@ export default function App() {
               {activeTab === "todos" && (
                 <DataCard title="Microsoft To-Do Tasks" subtitle="Active task list from Microsoft To-Do." icon={CheckSquare}>
                   {todos.length === 0 ? (
-                    <div className="text-center py-12 text-ink-muted text-sm italic">To-Do list is currently empty.</div>
+                    <div className="text-center py-14 text-ink-muted">
+                      <CheckSquare size={28} className="mx-auto mb-3 opacity-30" />
+                      <p className="text-sm italic">To-Do list is currently empty.</p>
+                    </div>
                   ) : (
-                    todos.map(t => (
-                      <div key={t.id} className="bg-surface-2/60 border border-border/80 p-4 rounded-2xl mb-3 flex items-center gap-3.5 hover:border-accent/30 transition-colors">
+                    todos.map((t, i) => (
+                      <motion.div
+                        key={t.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.04 }}
+                        className="bg-surface-2/60 border border-border/80 p-4 rounded-2xl mb-3 flex items-center gap-3.5 hover:border-accent/30 transition-colors">
                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                           t.status === 'completed' ? 'bg-accent border-accent text-accent-ink' : 'border-border'
                         }`}>
@@ -339,7 +399,7 @@ export default function App() {
                         <span className={`text-sm font-medium ${t.status === 'completed' ? 'line-through text-ink-muted' : 'text-ink'}`}>
                           {t.title}
                         </span>
-                      </div>
+                      </motion.div>
                     ))
                   )}
                 </DataCard>

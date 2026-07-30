@@ -29,3 +29,34 @@ def save_user_tokens(email: str, access_token: str, refresh_token: str, expires_
     # Upsert user record into Supabase
     response = supabase.table("users").upsert(data, on_conflict="email").execute()
     return response.data
+
+def get_user_id(email: str):
+    """Looks up the internal users.id for a given email (chat_history rows key off this, not email)."""
+    response = supabase.table("users").select("id").eq("email", email).limit(1).execute()
+    if response.data:
+        return response.data[0]["id"]
+    return None
+
+def save_chat_message(email: str, role: str, content: str):
+    """Persists one chat turn (role is 'user' or 'assistant')."""
+    user_id = get_user_id(email)
+    if not user_id:
+        return None
+    data = {"user_id": user_id, "role": role, "content": content}
+    response = supabase.table("chat_history").insert(data).execute()
+    return response.data
+
+def get_chat_history(email: str, limit: int = 50):
+    """Returns this user's past chat turns, oldest first."""
+    user_id = get_user_id(email)
+    if not user_id:
+        return []
+    response = (
+        supabase.table("chat_history")
+        .select("role, content, created_at")
+        .eq("user_id", user_id)
+        .order("created_at", desc=False)
+        .limit(limit)
+        .execute()
+    )
+    return response.data or []

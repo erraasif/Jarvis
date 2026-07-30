@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, EmailStr
 from langchain_core.messages import HumanMessage
 from app.agent.graph import jarvis_agent
+from app.services.supabase_client import save_chat_message, get_chat_history
 
 router = APIRouter(prefix="/chat", tags=["Jarvis Chat"])
 
@@ -13,16 +14,40 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
 
+@router.get("/history")
+def chat_history(user_email: EmailStr):
+    return {"history": get_chat_history(user_email)}
+
 @router.post("")
 def chat_with_jarvis(req: ChatRequest):
     initial_state = {
         "messages": [HumanMessage(content=f"User Email: {req.user_email}\nMessage: {req.message}")],
         "user_email": req.user_email
     }
-    
-    # Non-streaming fallback / instant invoke
-    result = jarvis_agent.invoke(initial_state)
-    return {"reply": result["messages"][-1].content}
+
+    try:
+        # Non-streaming fallback / instant invoke
+        result = jarvis_agent.invoke(initial_state)
+        reply = result["messages"][-1].content
+
+        # Persist both sides of the exchange. Best-effort: a logging
+        # failure here shouldn't break the chat reply itself.
+        try:
+            save_chat_message(req.user_email, "user", req.message)
+            save_chat_message(req.user_email, "assistant", reply)
+        except Exception:
+            import traceback
+            traceback.print_exc()
+
+        return {"reply": reply}
+    except Exception as e:
+        # Return a real JSON error instead of letting FastAPI's default
+        # handler send plain text — the frontend does res.json() on this
+        # response, which throws on non-JSON and shows a generic
+        # "could not connect" message that hides the actual cause.
+        import traceback
+        traceback.print_exc()
+        return {"reply": f"Jarvis hit an error processing that request: {e}"}
 
 
 @router.post("/stream")

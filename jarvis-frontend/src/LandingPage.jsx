@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Calendar, CheckSquare, ArrowRight, ShieldCheck, Sparkles } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
@@ -6,6 +6,16 @@ import { ThemeToggle } from './ThemeToggle';
 // --- Interactive 3D Canvas Sphere / Core Visual ---
 const Interactive3DCore = () => {
   const canvasRef = useRef(null);
+  const wrapperRef = useRef(null);
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+
+  const handleMouseMove = (e) => {
+    const rect = wrapperRef.current.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width - 0.5;
+    const py = (e.clientY - rect.top) / rect.height - 0.5;
+    setTilt({ x: py * -14, y: px * 14 });
+  };
+  const handleMouseLeave = () => setTilt({ x: 0, y: 0 });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -87,7 +97,19 @@ const Interactive3DCore = () => {
   }, []);
 
   return (
-    <div className="relative flex items-center justify-center w-[320px] h-[320px] md:w-[400px] md:h-[400px]">
+    <div
+      ref={wrapperRef}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      style={{ perspective: 900 }}
+      className="relative flex items-center justify-center w-[320px] h-[320px] md:w-[400px] md:h-[400px]"
+    >
+      <motion.div
+        animate={{ rotateX: tilt.x, rotateY: tilt.y }}
+        transition={{ type: "spring", stiffness: 120, damping: 14 }}
+        style={{ transformStyle: "preserve-3d" }}
+        className="relative w-full h-full flex items-center justify-center"
+      >
       {/* Outer Pulse Rings */}
       <div className="absolute inset-0 rounded-full border border-purple-500/20 dark:border-purple-500/30 animate-ping opacity-20 pointer-events-none" />
       <div className="absolute inset-8 rounded-full border border-indigo-500/30 dark:border-indigo-400/20 blur-[1px]" />
@@ -99,6 +121,7 @@ const Interactive3DCore = () => {
       <motion.div 
         animate={{ y: [0, -8, 0] }} 
         transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+        style={{ transform: "translateZ(60px)" }}
         className="absolute top-6 right-6 z-20 p-3 rounded-2xl bg-white/70 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200 dark:border-slate-800 shadow-xl text-purple-600 dark:text-purple-400"
       >
         <Mail className="w-5 h-5" />
@@ -107,6 +130,7 @@ const Interactive3DCore = () => {
       <motion.div 
         animate={{ y: [0, 8, 0] }} 
         transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
+        style={{ transform: "translateZ(60px)" }}
         className="absolute bottom-10 left-4 z-20 p-3 rounded-2xl bg-white/70 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200 dark:border-slate-800 shadow-xl text-indigo-600 dark:text-indigo-400"
       >
         <Calendar className="w-5 h-5" />
@@ -115,9 +139,11 @@ const Interactive3DCore = () => {
       <motion.div 
         animate={{ y: [0, -6, 0] }} 
         transition={{ repeat: Infinity, duration: 3.5, ease: "easeInOut" }}
+        style={{ transform: "translateZ(60px)" }}
         className="absolute top-1/2 left-0 -translate-y-1/2 z-20 p-3 rounded-2xl bg-white/70 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200 dark:border-slate-800 shadow-xl text-emerald-600 dark:text-emerald-400"
       >
         <CheckSquare className="w-5 h-5" />
+      </motion.div>
       </motion.div>
     </div>
   );
@@ -137,11 +163,14 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
 
       {/* Header */}
       <header className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between relative z-30">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-purple-500/25">
-            J
+        <div className="flex items-center gap-2.5">
+          <div className="relative w-9 h-9 shrink-0">
+            <div className="absolute inset-0 rounded-full border border-accent/50 animate-glow-pulse" />
+            <div className="absolute inset-[3px] rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-white font-display font-bold text-lg shadow-lg shadow-purple-500/25">
+              J
+            </div>
           </div>
-          <span className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-400">
+          <span className="font-display text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-400">
             Jarvis.
           </span>
         </div>
@@ -156,7 +185,7 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
         <motion.div 
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-500/10 dark:bg-purple-400/10 border border-purple-500/20 text-purple-700 dark:text-purple-300 text-xs font-semibold uppercase tracking-widest mb-8 backdrop-blur-md"
+          className="font-mono inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-500/10 dark:bg-purple-400/10 border border-purple-500/20 text-purple-700 dark:text-purple-300 text-xs font-semibold uppercase tracking-widest mb-8 backdrop-blur-md"
         >
           <Sparkles className="w-3.5 h-3.5" />
           Personal Agent for Microsoft 365
@@ -177,7 +206,7 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tight max-w-4xl leading-[1.1] mb-6"
+          className="font-display text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight max-w-3xl leading-[1.15] mb-6"
         >
           Your inbox, calendar, and to-dos —{' '}
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-600 via-indigo-500 to-blue-500 dark:from-purple-400 dark:via-indigo-300 dark:to-blue-400">
@@ -210,7 +239,7 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </button>
 
-          <span className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-500 font-medium">
+          <span className="font-mono flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-500 font-medium">
             <ShieldCheck className="w-4 h-4 text-emerald-500" />
             Authenticated via Microsoft Entra ID
           </span>
@@ -228,10 +257,10 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
             <div className="w-12 h-12 rounded-2xl bg-purple-500/10 dark:bg-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400 mb-6 group-hover:scale-110 transition-transform">
               <Mail className="w-6 h-6" />
             </div>
-            <span className="text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 mb-2 block">
+            <span className="font-mono text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 mb-2 block">
               Mailbox
             </span>
-            <h3 className="text-xl font-bold mb-2">Reads, never sends without you</h3>
+            <h3 className="font-display text-xl font-bold mb-2">Reads, never sends without you</h3>
             <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
               Ask Jarvis to summarize your inbox or draft a reply. Every draft waits in Outlook for your review.
             </p>
@@ -242,10 +271,10 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
             <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-6 group-hover:scale-110 transition-transform">
               <Calendar className="w-6 h-6" />
             </div>
-            <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-2 block">
+            <span className="font-mono text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-2 block">
               Calendar
             </span>
-            <h3 className="text-xl font-bold mb-2">Full control over schedule</h3>
+            <h3 className="font-display text-xl font-bold mb-2">Full control over schedule</h3>
             <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
               Create, reschedule, or cancel events by describing them in plain conversational language.
             </p>
@@ -256,10 +285,10 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
             <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-6 group-hover:scale-110 transition-transform">
               <CheckSquare className="w-6 h-6" />
             </div>
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2 block">
+            <span className="font-mono text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2 block">
               Tasks
             </span>
-            <h3 className="text-xl font-bold mb-2">Your Microsoft To Do, spoken</h3>
+            <h3 className="font-display text-xl font-bold mb-2">Your Microsoft To Do, spoken</h3>
             <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
               Add, complete, or reorganize tasks in a single sentence without filling out manual forms.
             </p>
