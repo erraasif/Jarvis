@@ -25,6 +25,7 @@ class ChatRequest(BaseModel):
     """Payload schema for chat interactions."""
     user_email: EmailStr
     message: str
+    timezone: str = "UTC"  # Optional IANA timezone string (e.g. 'Asia/Karachi')
 
 
 class ChatResponse(BaseModel):
@@ -61,8 +62,9 @@ def chat_with_jarvis(req: ChatRequest):
     and persists conversation logs asynchronously.
     """
     initial_state = {
-        "messages": [HumanMessage(content=f"User Email: {req.user_email}\nMessage: {req.message}")],
-        "user_email": req.user_email
+        "messages": [HumanMessage(content=f"User Email: {req.user_email}\nUser Timezone: {req.timezone}\nMessage: {req.message}")],
+        "user_email": req.user_email,
+        "user_timezone": req.timezone
     }
 
     try:
@@ -101,8 +103,9 @@ async def chat_stream_with_jarvis(req: ChatRequest):
     Accumulates response tokens and persists interaction logs upon stream completion.
     """
     initial_state = {
-        "messages": [HumanMessage(content=f"User Email: {req.user_email}\nMessage: {req.message}")],
-        "user_email": req.user_email
+        "messages": [HumanMessage(content=f"User Email: {req.user_email}\nUser Timezone: {req.timezone}\nMessage: {req.message}")],
+        "user_email": req.user_email,
+        "user_timezone": req.timezone
     }
 
     async def event_generator():

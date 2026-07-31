@@ -1,9 +1,10 @@
 /**
- * Landing Page Component
- * =======================
- * Serves as the primary public landing page for JARVIS.
- * Displays interactive 3D particle visualizer, Microsoft Entra ID authentication CTA,
- * and service feature overview cards.
+ * Refactored Production Landing Page Component
+ * ===========================================
+ * Fixes:
+ * - Dynamic theme accent sync inside requestAnimationFrame loop
+ * - Corrected responsive Tailwind arbitrary dimensions
+ * - Enhanced mobile viewport stacking & accessibility focus states
  */
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -14,10 +15,18 @@ import Logo from './Logo.jsx';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "https://jarvis-backend-h38f.onrender.com";
 
-/**
- * Interactive 3D Canvas Sphere / Core Visual
- * Renders a rotating 3D particle sphere responding to cursor tilt vectors.
- */
+function getAccentRGB() {
+  if (typeof window === "undefined") return [139, 92, 246];
+  const probe = document.createElement('div');
+  probe.style.color = 'var(--color-accent)';
+  probe.style.display = 'none';
+  document.body.appendChild(probe);
+  const resolved = getComputedStyle(probe).color;
+  document.body.removeChild(probe);
+  const match = resolved.match(/\d+/g);
+  return match ? match.slice(0, 3).map(Number) : [139, 92, 246];
+}
+
 const Interactive3DCore = () => {
   const canvasRef = useRef(null);
   const wrapperRef = useRef(null);
@@ -42,9 +51,8 @@ const Interactive3DCore = () => {
 
     let animationFrameId;
 
-    // Support Crisp High-DPI Canvas Rendering
     const dpr = window.devicePixelRatio || 1;
-    const displaySize = 400;
+    const displaySize = 340;
     canvas.width = displaySize * dpr;
     canvas.height = displaySize * dpr;
     ctx.scale(dpr, dpr);
@@ -53,10 +61,9 @@ const Interactive3DCore = () => {
     const height = displaySize;
 
     const particles = [];
-    const numParticles = 120;
-    const radius = 110;
+    const numParticles = 130;
+    const radius = 95;
 
-    // Initialize 3D Spherical Particle Coordinates
     for (let i = 0; i < numParticles; i++) {
       const theta = Math.acos(2 * Math.random() - 1);
       const phi = 2 * Math.PI * Math.random();
@@ -75,13 +82,13 @@ const Interactive3DCore = () => {
       const centerX = width / 2;
       const centerY = height / 2;
 
-      // Rotate Particles in 3D Space
+      // Real-time theme accent update inside loop
+      const [ar, ag, ab] = getAccentRGB();
+
       particles.forEach((p) => {
-        // Rotate around Y axis
         const x1 = p.x * Math.cos(angleY) - p.z * Math.sin(angleY);
         const z1 = p.z * Math.cos(angleY) + p.x * Math.sin(angleY);
 
-        // Rotate around X axis
         const y1 = p.y * Math.cos(angleX) - z1 * Math.sin(angleX);
         const z2 = z1 * Math.cos(angleX) + p.y * Math.sin(angleX);
 
@@ -89,27 +96,25 @@ const Interactive3DCore = () => {
         p.y = y1;
         p.z = z2;
 
-        // Perspective projection calculation
-        const scale = 300 / (300 + p.z);
+        const scale = 280 / (280 + p.z);
         const projX = p.x * scale + centerX;
         const projY = p.y * scale + centerY;
         const alpha = (p.z + radius) / (2 * radius);
 
         ctx.beginPath();
-        ctx.arc(projX, projY, Math.max(1, 2.5 * scale), 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(147, 51, 234, ${Math.max(0.2, alpha)})`;
+        ctx.arc(projX, projY, Math.max(1, 2.2 * scale), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${ar}, ${ag}, ${ab}, ${Math.max(0.25, alpha)})`;
         ctx.fill();
       });
 
-      // Draw Radial Glowing Core Center
-      const gradient = ctx.createRadialGradient(centerX, centerY, 10, centerX, centerY, 90);
-      gradient.addColorStop(0, 'rgba(168, 85, 247, 0.4)');
-      gradient.addColorStop(0.5, 'rgba(99, 102, 241, 0.15)');
+      const gradient = ctx.createRadialGradient(centerX, centerY, 10, centerX, centerY, 80);
+      gradient.addColorStop(0, `rgba(${ar}, ${ag}, ${ab}, 0.35)`);
+      gradient.addColorStop(0.6, `rgba(${ar}, ${ag}, ${ab}, 0.1)`);
       gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
       ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.arc(centerX, centerY, 90, 0, Math.PI * 2);
+      ctx.arc(centerX, centerY, 80, 0, Math.PI * 2);
       ctx.fill();
 
       animationFrameId = requestAnimationFrame(render);
@@ -126,7 +131,7 @@ const Interactive3DCore = () => {
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       style={{ perspective: 900 }}
-      className="relative flex items-center justify-center w-80 h-80 md:w-100 md:h-100"
+      className="relative flex items-center justify-center w-72 h-72 md:w-96 md:h-96"
     >
       <motion.div
         animate={{ rotateX: tilt.x, rotateY: tilt.y }}
@@ -134,44 +139,86 @@ const Interactive3DCore = () => {
         style={{ transformStyle: "preserve-3d" }}
         className="relative w-full h-full flex items-center justify-center"
       >
-        {/* Outer Pulse Rings */}
-        <div className="absolute inset-0 rounded-full border border-purple-500/20 dark:border-purple-500/30 animate-ping opacity-20 pointer-events-none" />
-        <div className="absolute inset-8 rounded-full border border-indigo-500/30 dark:border-indigo-400/20 blur-[1px]" />
+        <div className="absolute inset-0 rounded-full border border-accent/20 animate-ping opacity-20 pointer-events-none" />
+        <div className="absolute inset-6 rounded-full border border-accent/25 blur-[1px]" />
 
-        {/* 3D Particle Canvas */}
-        <canvas ref={canvasRef} className="relative z-10 w-[400px] h-[400px]" />
-
-        {/* Floating Action Badges */}
-        <motion.div
-          animate={{ y: [0, -8, 0] }}
-          transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-          style={{ transform: "translateZ(60px)" }}
-          className="absolute top-6 right-6 z-20 p-3 rounded-2xl bg-white/70 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200 dark:border-slate-800 shadow-xl text-purple-600 dark:text-purple-400"
-        >
-          <Mail className="w-5 h-5" />
-        </motion.div>
-
-        <motion.div
-          animate={{ y: [0, 8, 0] }}
-          transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
-          style={{ transform: "translateZ(60px)" }}
-          className="absolute bottom-10 left-4 z-20 p-3 rounded-2xl bg-white/70 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200 dark:border-slate-800 shadow-xl text-indigo-600 dark:text-indigo-400"
-        >
-          <Calendar className="w-5 h-5" />
-        </motion.div>
+        <canvas ref={canvasRef} className="relative z-10 w-full h-full" />
 
         <motion.div
           animate={{ y: [0, -6, 0] }}
-          transition={{ repeat: Infinity, duration: 3.5, ease: "easeInOut" }}
-          style={{ transform: "translateZ(60px)" }}
-          className="absolute top-1/2 left-0 -translate-y-1/2 z-20 p-3 rounded-2xl bg-white/70 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200 dark:border-slate-800 shadow-xl text-emerald-600 dark:text-emerald-400"
+          transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+          style={{ transform: "translateZ(50px)" }}
+          className="absolute top-4 right-4 z-20 p-2.5 rounded-2xl bg-surface/80 backdrop-blur-xl border border-border shadow-xl text-accent"
         >
-          <CheckSquare className="w-5 h-5" />
+          <Mail className="w-4 h-4 md:w-5 md:h-5" />
+        </motion.div>
+
+        <motion.div
+          animate={{ y: [0, 6, 0] }}
+          transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
+          style={{ transform: "translateZ(50px)" }}
+          className="absolute bottom-6 left-2 z-20 p-2.5 rounded-2xl bg-surface/80 backdrop-blur-xl border border-border shadow-xl text-accent"
+        >
+          <Calendar className="w-4 h-4 md:w-5 md:h-5" />
+        </motion.div>
+
+        <motion.div
+          animate={{ y: [0, -5, 0] }}
+          transition={{ repeat: Infinity, duration: 3.5, ease: "easeInOut" }}
+          style={{ transform: "translateZ(50px)" }}
+          className="absolute top-1/2 left-0 -translate-y-1/2 z-20 p-2.5 rounded-2xl bg-surface/80 backdrop-blur-xl border border-border shadow-xl text-accent"
+        >
+          <CheckSquare className="w-4 h-4 md:w-5 md:h-5" />
         </motion.div>
       </motion.div>
     </div>
   );
 };
+
+const features = [
+  {
+    icon: Mail,
+    eyebrow: "MAILBOX",
+    title: "Reads, never sends without you",
+    body: "Ask Jarvis to summarize your inbox or draft a reply. Every draft waits safely in Outlook for your review.",
+  },
+  {
+    icon: Calendar,
+    eyebrow: "CALENDAR",
+    title: "Full control over schedule",
+    body: "Create, reschedule, or cancel events by describing them in natural conversational language.",
+  },
+  {
+    icon: CheckSquare,
+    eyebrow: "TASKS",
+    title: "Your Microsoft To Do, spoken",
+    body: "Add, complete, or reorganize tasks in a single prompt without manual form filing.",
+  },
+];
+
+function FeatureCard({ icon: Icon, eyebrow, title, body, index }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.3 }}
+      transition={{ duration: 0.5, delay: index * 0.1, ease: "easeOut" }}
+      whileHover={{ y: -4 }}
+      className="group relative p-6 md:p-8 rounded-3xl bg-surface/70 backdrop-blur-xl border border-border/80 overflow-hidden text-left shadow-xl transition-all duration-300 hover:border-accent/40"
+    >
+      <div className="pointer-events-none absolute -inset-1 rounded-3xl bg-accent/0 group-hover:bg-accent/5 blur-xl transition-all duration-500" />
+
+      <div className="relative w-11 h-11 rounded-2xl bg-accent/10 flex items-center justify-center text-accent mb-5">
+        <Icon className="w-5 h-5" />
+      </div>
+      <span className="relative font-mono text-[11px] font-bold uppercase tracking-wider text-accent mb-1.5 block">
+        {eyebrow}
+      </span>
+      <h3 className="relative font-display text-lg font-bold mb-2 text-ink">{title}</h3>
+      <p className="relative text-xs md:text-sm text-ink-muted leading-relaxed">{body}</p>
+    </motion.div>
+  );
+}
 
 export default function LandingPage({ onLogin, isDark, setIsDark }) {
   const handleLogin = onLogin || (() => {
@@ -179,16 +226,17 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
   });
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#07090e] text-slate-900 dark:text-slate-100 transition-colors duration-500 overflow-hidden relative selection:bg-purple-500 selection:text-white">
-      {/* Background Ambient Glow Gradients */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-200 h-125 bg-linear-to-b from-purple-500/15 via-indigo-500/10 to-transparent blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-0 right-0 w-125 h-125 bg-blue-500/10 dark:bg-blue-600/10 blur-[150px] pointer-events-none" />
+    <div className="min-h-screen bg-bg text-ink transition-colors duration-500 overflow-hidden relative selection:bg-accent/30">
+      <div className="absolute inset-0 bg-grid-scan pointer-events-none [mask-image:radial-gradient(ellipse_60%_60%_at_50%_20%,black,transparent)]" />
+
+      {/* Standardized Tailwind Gradient Widths */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-accent/10 blur-[130px] pointer-events-none" />
 
       {/* Header */}
-      <header className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between relative z-30">
+      <header className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between relative z-30">
         <div className="flex items-center gap-2.5">
-          <Logo size={38} />
-          <span className="font-display text-xl font-bold tracking-tight text-slate-900 dark:text-white text-glow">
+          <Logo size={34} />
+          <span className="font-display text-xl font-bold tracking-tight text-ink">
             Jarvis
           </span>
         </div>
@@ -197,120 +245,73 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
       </header>
 
       {/* Hero Section */}
-      <main className="max-w-6xl mx-auto px-6 pt-8 pb-20 relative z-20 flex flex-col items-center text-center">
-        {/* Badge */}
+      <main className="max-w-5xl mx-auto px-6 pt-4 pb-20 relative z-20 flex flex-col items-center text-center">
         <motion.div
-          initial={{ opacity: 0, y: 15 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="font-mono inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-500/10 dark:bg-purple-400/10 border border-purple-500/20 text-purple-700 dark:text-purple-300 text-xs font-semibold uppercase tracking-widest mb-8 backdrop-blur-md"
+          className="font-mono inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-accent/10 border border-accent/20 text-accent text-[11px] font-semibold uppercase tracking-widest mb-6 backdrop-blur-md"
         >
           <Sparkles className="w-3.5 h-3.5" />
-          Personal Agent for Microsoft 365
+          Autonomous Assistant for M365
         </motion.div>
 
-        {/* 3D Core Visual */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
+          initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.8 }}
-          className="mb-8"
+          transition={{ duration: 0.6 }}
+          className="mb-6"
         >
           <Interactive3DCore />
         </motion.div>
 
-        {/* Main Heading */}
         <motion.h1
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="font-display text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight max-w-3xl leading-[1.15] mb-6"
+          transition={{ delay: 0.15 }}
+          className="font-display text-2xl md:text-4xl lg:text-5xl font-bold tracking-tight max-w-3xl leading-[1.18] mb-4 text-ink"
         >
           Your inbox, calendar, and to-dos —{' '}
-          <span className="text-glow-gradient bg-clip-text text-transparent bg-linear-to-r from-purple-600 via-indigo-500 to-blue-500 dark:from-purple-400 dark:via-indigo-300 dark:to-blue-400">
-            one conversation away.
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-accent via-purple-500 to-accent">
+            one prompt away.
           </span>
         </motion.h1>
 
-        {/* Subtitle */}
         <motion.p
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="text-lg md:text-xl text-slate-600 dark:text-slate-400 max-w-2xl font-normal leading-relaxed mb-10"
+          transition={{ delay: 0.25 }}
+          className="text-sm md:text-base text-ink-muted max-w-xl font-normal leading-relaxed mb-8"
         >
-          Tell Jarvis what you need. It reasons over your requests and acts directly on Outlook, Calendar, and To Do with complete accuracy.
+          Tell Jarvis what you need. It reasons over your requests and acts directly on Outlook Mail, Calendar, and To-Do with complete precision.
         </motion.p>
 
         {/* Primary CTA */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: 0.35 }}
           className="flex flex-col items-center gap-3"
         >
           <button
             onClick={handleLogin}
-            className="group relative inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-lg shadow-xl shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer"
+            className="group relative inline-flex items-center gap-3 px-7 py-3.5 rounded-2xl bg-accent text-accent-ink font-semibold text-base shadow-xl shadow-accent/20 hover:opacity-95 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
           >
             <span>Sign in with Microsoft</span>
-            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </button>
 
-          <span className="font-mono flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-500 font-medium">
+          <span className="font-mono flex items-center gap-1.5 text-[11px] text-ink-muted font-medium mt-1">
             <ShieldCheck className="w-4 h-4 text-emerald-500" />
             Authenticated via Microsoft Entra ID
           </span>
         </motion.div>
 
-        {/* Feature Cards Grid */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl mt-20"
-        >
-          {/* Card 1 */}
-          <div className="group p-8 rounded-3xl bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800/80 hover:border-purple-500/40 dark:hover:border-purple-500/40 transition-all duration-300 text-left hover:-translate-y-1.5 shadow-xl shadow-slate-200/50 dark:shadow-none">
-            <div className="w-12 h-12 rounded-2xl bg-purple-500/10 dark:bg-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400 mb-6 group-hover:scale-110 transition-transform">
-              <Mail className="w-6 h-6" />
-            </div>
-            <span className="font-mono text-xs font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 mb-2 block">
-              Mailbox
-            </span>
-            <h3 className="font-display text-xl font-bold mb-2">Reads, never sends without you</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-              Ask Jarvis to summarize your inbox or draft a reply. Every draft waits in Outlook for your review.
-            </p>
-          </div>
-
-          {/* Card 2 */}
-          <div className="group p-8 rounded-3xl bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800/80 hover:border-indigo-500/40 dark:hover:border-indigo-500/40 transition-all duration-300 text-left hover:-translate-y-1.5 shadow-xl shadow-slate-200/50 dark:shadow-none">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-6 group-hover:scale-110 transition-transform">
-              <Calendar className="w-6 h-6" />
-            </div>
-            <span className="font-mono text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-2 block">
-              Calendar
-            </span>
-            <h3 className="font-display text-xl font-bold mb-2">Full control over schedule</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-              Create, reschedule, or cancel events by describing them in plain conversational language.
-            </p>
-          </div>
-
-          {/* Card 3 */}
-          <div className="group p-8 rounded-3xl bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800/80 hover:border-emerald-500/40 dark:hover:border-emerald-500/40 transition-all duration-300 text-left hover:-translate-y-1.5 shadow-xl shadow-slate-200/50 dark:shadow-none">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-6 group-hover:scale-110 transition-transform">
-              <CheckSquare className="w-6 h-6" />
-            </div>
-            <span className="font-mono text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2 block">
-              Tasks
-            </span>
-            <h3 className="font-display text-xl font-bold mb-2">Your Microsoft To Do, spoken</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-              Add, complete, or reorganize tasks in a single sentence without filling out manual forms.
-            </p>
-          </div>
-        </motion.div>
+        {/* Features Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 w-full max-w-4xl mt-16">
+          {features.map((f, i) => (
+            <FeatureCard key={f.title} index={i} {...f} />
+          ))}
+        </div>
       </main>
     </div>
   );

@@ -9,12 +9,6 @@ import { ThemeToggle } from "./ThemeToggle";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "https://jarvis-backend-h38f.onrender.com";
 
-/**
- * ChatInterface Component
- * =======================
- * Primary interactive workspace interface for interacting with Jarvis AI Agent.
- * Features sidebar controls, conversation threads, preset quick prompts, and markdown responses.
- */
 export default function ChatInterface({ userEmail, onLogout, isDark, setIsDark }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -46,6 +40,11 @@ export default function ChatInterface({ userEmail, onLogout, isDark, setIsDark }
         body: JSON.stringify({ user_email: userEmail, message: query }),
       });
 
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || `HTTP ${response.status}`);
+      }
+
       const data = await response.json();
       const botMessage = {
         id: Date.now() + 1,
@@ -59,7 +58,7 @@ export default function ChatInterface({ userEmail, onLogout, isDark, setIsDark }
         {
           id: Date.now() + 1,
           role: "assistant",
-          content: "❌ Connection error. Please try again.",
+          content: `❌ ${err.message || "Connection error. Please try again."}`,
         },
       ]);
     } finally {
@@ -152,71 +151,79 @@ export default function ChatInterface({ userEmail, onLogout, isDark, setIsDark }
 
         {/* Messages Feed or Empty State */}
         <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6 max-w-4xl mx-auto w-full">
-          {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center my-auto">
-              <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-white shadow-2xl shadow-purple-500/30 mb-6">
-                <Bot className="w-8 h-8" />
-              </div>
-              <h2 className="text-3xl font-extrabold tracking-tight mb-2">
-                How can I assist your workflow today?
-              </h2>
-              <p className="text-slate-500 dark:text-slate-400 max-w-md text-sm mb-10">
-                I can manage your Microsoft Outlook inbox, schedule calendar events, and organize your tasks seamlessly.
-              </p>
-
-              {/* Suggestions Cards Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full max-w-2xl">
-                {suggestions.map((item, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleSend(item.query)}
-                    className="p-4 rounded-2xl bg-white/60 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 hover:border-purple-500/50 dark:hover:border-purple-500/50 text-left transition-all duration-300 group shadow-sm hover:shadow-md cursor-pointer"
-                  >
-                    <item.icon className="w-5 h-5 text-purple-600 dark:text-purple-400 mb-3 group-hover:scale-110 transition-transform" />
-                    <span className="text-xs font-semibold text-slate-400 block mb-1">
-                      {item.label}
-                    </span>
-                    <span className="text-sm font-medium text-slate-800 dark:text-slate-200 line-clamp-2">
-                      "{item.query}"
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            messages.map((msg) => (
-              <motion.div
-                key={msg.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`flex gap-4 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+          <AnimatePresence initial={false}>
+            {messages.length === 0 ? (
+              <motion.div 
+                key="empty-state"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="h-full flex flex-col items-center justify-center text-center my-auto"
               >
-                {msg.role === "assistant" && (
-                  <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-white shrink-0 shadow-md">
-                    <Bot className="w-5 h-5" />
-                  </div>
-                )}
-
-                <div
-                  className={`max-w-[80%] rounded-3xl p-5 shadow-sm text-sm leading-relaxed ${
-                    msg.role === "user"
-                      ? "bg-purple-600 text-white rounded-br-none"
-                      : "bg-white/80 dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800/80 text-slate-800 dark:text-slate-100 rounded-bl-none"
-                  }`}
-                >
-                  <ReactMarkdown className="prose dark:prose-invert max-w-none">
-                    {msg.content}
-                  </ReactMarkdown>
+                <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-white shadow-2xl shadow-purple-500/30 mb-6">
+                  <Bot className="w-8 h-8" />
                 </div>
+                <h2 className="text-3xl font-extrabold tracking-tight mb-2">
+                  How can I assist your workflow today?
+                </h2>
+                <p className="text-slate-500 dark:text-slate-400 max-w-md text-sm mb-10">
+                  I can manage your Microsoft Outlook inbox, schedule calendar events, and organize your tasks seamlessly.
+                </p>
 
-                {msg.role === "user" && (
-                  <div className="w-9 h-9 rounded-2xl bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0 font-bold text-xs">
-                    You
-                  </div>
-                )}
+                {/* Suggestions Cards Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full max-w-2xl">
+                  {suggestions.map((item, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleSend(item.query)}
+                      className="p-4 rounded-2xl bg-white/60 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 hover:border-purple-500/50 dark:hover:border-purple-500/50 text-left transition-all duration-300 group shadow-sm hover:shadow-md cursor-pointer"
+                    >
+                      <item.icon className="w-5 h-5 text-purple-600 dark:text-purple-400 mb-3 group-hover:scale-110 transition-transform" />
+                      <span className="text-xs font-semibold text-slate-400 block mb-1">
+                        {item.label}
+                      </span>
+                      <span className="text-sm font-medium text-slate-800 dark:text-slate-200 line-clamp-2">
+                        "{item.query}"
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </motion.div>
-            ))
-          )}
+            ) : (
+              messages.map((msg) => (
+                <motion.div
+                  key={msg.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`flex gap-4 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  {msg.role === "assistant" && (
+                    <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-white shrink-0 shadow-md">
+                      <Bot className="w-5 h-5" />
+                    </div>
+                  )}
+
+                  <div
+                    className={`max-w-[80%] rounded-3xl p-5 shadow-sm text-sm leading-relaxed break-words overflow-x-auto ${
+                      msg.role === "user"
+                        ? "bg-purple-600 text-white rounded-br-none"
+                        : "bg-white/80 dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800/80 text-slate-800 dark:text-slate-100 rounded-bl-none"
+                    }`}
+                  >
+                    <ReactMarkdown className="prose dark:prose-invert max-w-none">
+                      {msg.content}
+                    </ReactMarkdown>
+                  </div>
+
+                  {msg.role === "user" && (
+                    <div className="w-9 h-9 rounded-2xl bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-300 shrink-0 font-bold text-xs">
+                      You
+                    </div>
+                  )}
+                </motion.div>
+              ))
+            )}
+          </AnimatePresence>
 
           {loading && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-4">

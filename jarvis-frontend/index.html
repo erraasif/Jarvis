@@ -1,19 +1,37 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#080a0f" />
-    <meta name="description" content="JARVIS M365 AI Agent HUD - Autonomous Workspace Copilot" />
-    <title>JARVIS | M365 Agent HUD</title>
-    
-    <!-- Sci-Fi Futuristic Fonts (Orbitron & Rajdhani) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <title>Jarvis</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <script>
+      // Apply saved theme + accent color before first paint, so nothing —
+      // including the landing page's canvas, which reads the accent via
+      // getComputedStyle — ever flashes the wrong color or renders with a
+      // stale one on first mount.
+      (function () {
+        var saved = localStorage.getItem("jarvis_theme");
+        var wantsDark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.classList.toggle("dark", wantsDark);
+        document.documentElement.classList.toggle("light", !wantsDark);
+
+        // Keep this list in sync with ACCENTS in src/ProfilePanel.jsx
+        var ACCENTS = {
+          violet: "light-dark(#5B3DF5, #8B7CFF)",
+          emerald: "light-dark(#059669, #34D399)",
+          rose: "light-dark(#E11D48, #FB7185)",
+          sky: "light-dark(#0284C7, #38BDF8)"
+        };
+        var savedAccent = localStorage.getItem("jarvis_accent") || "violet";
+        document.documentElement.style.setProperty("--color-accent", ACCENTS[savedAccent] || ACCENTS.violet);
+      })();
+    </script>
   </head>
-  <body class="bg-[#080a0f] text-slate-100 antialiased selection:bg-purple-500 selection:text-white">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

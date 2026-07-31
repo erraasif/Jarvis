@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Manual light/dark toggle via .dark class on <html> element */
+/* Manual light/dark toggle via a class on <html>, rather than only OS preference */
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
@@ -8,7 +8,7 @@
   --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
-  /* Custom Color System */
+  /* Deep indigo/violet system instead of a generic blue SaaS palette */
   --color-bg: light-dark(#F6F4F1, #0A0A12);
   --color-surface: light-dark(#FFFFFF, #13131F);
   --color-surface-2: light-dark(#F0EDE7, #191927);
@@ -38,53 +38,28 @@ body {
   background-color: var(--color-bg);
   color: var(--color-ink);
   font-family: var(--font-body);
-  transition: background-color 0.3s ease, color 0.3s ease;
-  overflow-x: hidden;
 }
 
-/* Custom Sleek Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: var(--color-border);
-  border-radius: 9999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background-color: var(--color-ink-muted);
-}
-
-/* Orbit & Core Animations */
+/* Signature landing animation: three service nodes orbiting the Jarvis mark */
 @keyframes orbit-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
-
 @keyframes orbit-spin-reverse {
   from { transform: rotate(360deg); }
   to { transform: rotate(0deg); }
 }
-
 .orbit-ring {
-  animation: orbit-spin 20s linear infinite;
+  animation: orbit-spin linear infinite;
 }
-
 .orbit-node {
-  animation: orbit-spin-reverse 20s linear infinite;
+  animation: orbit-spin-reverse linear infinite;
 }
 
 @keyframes fade-up {
   from { opacity: 0; transform: translateY(14px); }
   to { opacity: 1; transform: translateY(0); }
 }
-
 .animate-fade-up {
   animation: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -93,7 +68,6 @@ body {
   0%, 100% { opacity: 0.55; }
   50% { opacity: 0.9; }
 }
-
 .animate-glow-pulse {
   animation: glow-pulse 4s ease-in-out infinite;
 }
@@ -125,8 +99,51 @@ body {
     drop-shadow(0 0 34px light-dark(rgba(91,61,245,0.15), rgba(139,124,255,0.25)));
 }
 
+/* Subtle animated grid backdrop for the landing page — color derives from
+   the current accent via color-mix(), so it re-tints automatically when
+   the user changes their accent color, no JS needed. */
+.bg-grid-scan {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--color-accent) 12%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--color-accent) 12%, transparent) 1px, transparent 1px);
+  background-size: 46px 46px;
+  animation: grid-drift 22s linear infinite;
+}
+@keyframes grid-drift {
+  from { background-position: 0 0; }
+  to { background-position: 46px 46px; }
+}
+
+/* Rotating gradient "energy ring" outline — wraps the CTA button in a
+   thin spinning conic-gradient border. Accent-driven via var(). */
+.btn-energy-ring {
+  position: relative;
+  isolation: isolate;
+}
+.btn-energy-ring::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(from 0deg, transparent 0%, var(--color-accent) 15%, transparent 35%);
+  
+  /* Webkit & Standard Mask Properties for Cross-Browser Compatibility */
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  
+  animation: spin-ring 2.6s linear infinite;
+  pointer-events: none;
+}
+@keyframes spin-ring {
+  to { transform: rotate(360deg); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .orbit-ring, .orbit-node, .animate-fade-up, .animate-glow-pulse, .logo-node {
+  .orbit-ring, .orbit-node, .animate-fade-up, .animate-glow-pulse, .logo-node,
+  .bg-grid-scan, .btn-energy-ring::before {
     animation: none !important;
   }
 }

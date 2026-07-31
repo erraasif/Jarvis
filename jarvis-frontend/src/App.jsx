@@ -10,9 +10,11 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   MessageSquare, Mail, Calendar, CheckSquare, LogOut,
   Send, Bot, RefreshCcw, Sparkles, ShieldCheck, Sun, Moon,
-  Plus, Trash2, X, AlertCircle
+  Plus, Trash2, X, AlertCircle, Pencil, Check
 } from "lucide-react";
 import { motion } from "framer-motion";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import LandingPage from "./LandingPage.jsx";
 import Logo from "./Logo.jsx";
@@ -26,6 +28,44 @@ const TABS = [
   { id: "calendar", label: "Calendar", icon: Calendar },
   { id: "todos", label: "To-Do List", icon: CheckSquare },
 ];
+
+// Renders Jarvis's replies as formatted markdown (lists, bold, headings,
+// tables via GFM) instead of one dense wall of plain text. Tailwind's
+// typography classes aren't used here since we don't depend on the
+// @tailwindcss/typography plugin — styles are applied directly per element
+// so lists/headings/code still look intentional without adding a new
+// Tailwind plugin dependency.
+function MarkdownMessage({ text }) {
+  return (
+    <div className="text-[14.5px] leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          p: ({ node, ...props }) => <p className="my-2" {...props} />,
+          ul: ({ node, ...props }) => <ul className="my-2 ml-5 list-disc space-y-1" {...props} />,
+          ol: ({ node, ...props }) => <ol className="my-2 ml-5 list-decimal space-y-1" {...props} />,
+          li: ({ node, ...props }) => <li className="pl-0.5" {...props} />,
+          strong: ({ node, ...props }) => <strong className="font-semibold text-ink" {...props} />,
+          h1: ({ node, ...props }) => <h1 className="font-display text-lg font-bold mt-3 mb-1.5" {...props} />,
+          h2: ({ node, ...props }) => <h2 className="font-display text-base font-bold mt-3 mb-1.5" {...props} />,
+          h3: ({ node, ...props }) => <h3 className="font-display text-sm font-bold mt-2 mb-1" {...props} />,
+          a: ({ node, ...props }) => <a className="text-accent underline underline-offset-2" target="_blank" rel="noreferrer" {...props} />,
+          code: ({ node, inline, ...props }) =>
+            inline
+              ? <code className="px-1.5 py-0.5 rounded-md bg-surface-2 border border-border text-[13px] font-mono" {...props} />
+              : <code className="block p-3 rounded-xl bg-surface-2 border border-border text-[13px] font-mono overflow-x-auto" {...props} />,
+          blockquote: ({ node, ...props }) => <blockquote className="border-l-2 border-accent/40 pl-3 my-2 text-ink-muted italic" {...props} />,
+          table: ({ node, ...props }) => <div className="overflow-x-auto my-2"><table className="w-full text-xs border-collapse" {...props} /></div>,
+          th: ({ node, ...props }) => <th className="border border-border px-2 py-1.5 bg-surface-2 text-left font-semibold" {...props} />,
+          td: ({ node, ...props }) => <td className="border border-border px-2 py-1.5" {...props} />,
+          hr: ({ node, ...props }) => <hr className="my-3 border-border" {...props} />,
+        }}
+      >
+        {text}
+      </ReactMarkdown>
+    </div>
+  );
+}
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -176,7 +216,10 @@ export default function App() {
 
   // Form input and state handlers
   const [newTodoTitle, setNewTodoTitle] = useState("");
+  const [editingTodoId, setEditingTodoId] = useState(null);
+  const [editingTodoText, setEditingTodoText] = useState("");
   const [showEventForm, setShowEventForm] = useState(false);
+  const [editingEventId, setEditingEventId] = useState(null);
   const [newEvent, setNewEvent] = useState({ subject: "", start: "", end: "" });
 
   const handleApiResult = async (res, onSuccess) => {
@@ -212,26 +255,66 @@ export default function App() {
     await handleApiResult(res, fetchTodos);
   };
 
+  const updateTodoTitle = async (taskId, newTitle) => {
+    if (!newTitle.trim()) return;
+    const userEmail = currentUserEmailFor();
+    const res = await fetch(`${API_BASE_URL}/todos/${taskId}?user_email=${encodeURIComponent(userEmail)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: newTitle }),
+    });
+    await handleApiResult(res, () => { setEditingTodoId(null); fetchTodos(); });
+  };
+
   const deleteTodo = async (taskId) => {
     const userEmail = currentUserEmailFor();
     const res = await fetch(`${API_BASE_URL}/todos/${taskId}?user_email=${encodeURIComponent(userEmail)}`, { method: "DELETE" });
     await handleApiResult(res, fetchTodos);
   };
 
-  const createEvent = async (e) => {
+  const submitEvent = async (e) => {
     e.preventDefault();
     if (!newEvent.subject || !newEvent.start || !newEvent.end) return;
     const userEmail = currentUserEmailFor();
-    const res = await fetch(`${API_BASE_URL}/events?user_email=${encodeURIComponent(userEmail)}`, {
-      method: "POST",
+    const payload = {
+      subject: newEvent.subject,
+      start: { dateTime: newEvent.start, timeZone: "UTC" },
+      end: { dateTime: newEvent.end, timeZone: "UTC" },
+    };
+    const url = editingEventId
+      ? `${API_BASE_URL}/events/${editingEventId}?user_email=${encodeURIComponent(userEmail)}`
+      : `${API_BASE_URL}/events?user_email=${encodeURIComponent(userEmail)}`;
+    const res = await fetch(url, {
+      method: editingEventId ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        subject: newEvent.subject,
-        start: { dateTime: newEvent.start, timeZone: "UTC" },
-        end: { dateTime: newEvent.end, timeZone: "UTC" },
-      }),
+      body: JSON.stringify(payload),
     });
-    await handleApiResult(res, () => { setNewEvent({ subject: "", start: "", end: "" }); setShowEventForm(false); fetchEvents(); });
+    await handleApiResult(res, () => {
+      setNewEvent({ subject: "", start: "", end: "" });
+      setShowEventForm(false);
+      setEditingEventId(null);
+      fetchEvents();
+    });
+  };
+
+  // Graph returns ISO datetimes (e.g. "2026-08-01T15:00:00.0000000") — trim
+  // to the "YYYY-MM-DDTHH:mm" shape a <input type="datetime-local"> expects.
+  const toLocalInputValue = (iso) => (iso ? iso.slice(0, 16) : "");
+
+  const openEditEvent = (evt) => {
+    setNewEvent({
+      subject: evt.subject || "",
+      start: toLocalInputValue(evt.start?.dateTime),
+      end: toLocalInputValue(evt.end?.dateTime),
+    });
+    setEditingEventId(evt.id);
+    setShowEventForm(true);
+  };
+
+  const closeEventForm = () => {
+    setShowEventForm(false);
+    setEditingEventId(null);
+    setNewEvent({ subject: "", start: "", end: "" });
   };
 
   const deleteEvent = async (eventId) => {
@@ -378,12 +461,12 @@ export default function App() {
                       }`}>
                         {msg.sender === "jarvis" ? <Bot size={18} /> : "You"}
                       </div>
-                      <div className={`p-5 rounded-3xl text-[14.5px] leading-relaxed shadow-sm min-w-0 wrap-break-word whitespace-pre-wrap ${
+                      <div className={`px-5 py-4 rounded-3xl shadow-sm min-w-0 wrap-break-word ${
                         msg.sender === "user"
-                          ? "bg-accent text-accent-ink rounded-tr-none font-medium"
+                          ? "bg-accent text-accent-ink rounded-tr-none font-medium text-[14.5px] leading-relaxed whitespace-pre-wrap"
                           : "bg-surface text-ink border border-border/80 rounded-tl-none"
                       }`}>
-                        {msg.text}
+                        {msg.sender === "jarvis" ? <MarkdownMessage text={msg.text} /> : msg.text}
                       </div>
                     </div>
                   </div>
@@ -451,9 +534,15 @@ export default function App() {
                         transition={{ delay: i * 0.04 }}
                         className="bg-surface-2/60 border border-border/80 p-5 rounded-2xl mb-4 last:mb-0 hover:border-accent/30 transition-colors"
                       >
-                        <div className="flex justify-between items-center mb-2.5">
-                          <strong className="text-ink text-base font-semibold">{m.subject || "(No Subject)"}</strong>
-                          <span className="text-[11px] px-3 py-1 bg-amber/15 text-amber border border-amber/30 rounded-full font-bold uppercase tracking-wider">Draft</span>
+                        <div className="flex justify-between items-center mb-2.5 gap-3">
+                          <strong className="text-ink text-base font-semibold truncate">{m.subject || "(No Subject)"}</strong>
+                          {m.isDraft ? (
+                            <span className="shrink-0 text-[11px] px-3 py-1 bg-amber/15 text-amber border border-amber/30 rounded-full font-bold uppercase tracking-wider">Draft</span>
+                          ) : (
+                            <span className="shrink-0 text-[11px] px-3 py-1 bg-surface-2 text-ink-muted border border-border rounded-full font-medium truncate max-w-[160px]">
+                              {m.from?.emailAddress?.name || "Received"}
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs md:text-sm text-ink-muted leading-relaxed line-clamp-2">{m.bodyPreview || "No preview available."}</p>
                       </motion.div>
@@ -469,7 +558,7 @@ export default function App() {
                   icon={Calendar}
                   action={
                     <button
-                      onClick={() => setShowEventForm((v) => !v)}
+                      onClick={() => (showEventForm ? closeEventForm() : setShowEventForm(true))}
                       className="flex items-center gap-1.5 text-xs font-semibold text-accent bg-accent/10 hover:bg-accent/20 border border-accent/30 px-3.5 py-2 rounded-xl transition shrink-0 cursor-pointer"
                     >
                       {showEventForm ? <X size={14} /> : <Plus size={14} />} {showEventForm ? "Cancel" : "Add Event"}
@@ -477,7 +566,7 @@ export default function App() {
                   }
                 >
                   {showEventForm && (
-                    <form onSubmit={createEvent} className="bg-surface-2/60 border border-border/80 p-5 rounded-2xl mb-4 space-y-3">
+                    <form onSubmit={submitEvent} className="bg-surface-2/60 border border-border/80 p-5 rounded-2xl mb-4 space-y-3">
                       <input
                         type="text"
                         placeholder="Event title"
@@ -503,7 +592,7 @@ export default function App() {
                         />
                       </div>
                       <button type="submit" className="bg-accent text-accent-ink text-sm font-semibold px-5 py-2.5 rounded-xl hover:opacity-90 transition cursor-pointer">
-                        Create Event
+                        {editingEventId ? "Save Changes" : "Create Event"}
                       </button>
                     </form>
                   )}
@@ -527,9 +616,14 @@ export default function App() {
                             {new Date(e.start?.dateTime).toLocaleString()} — {new Date(e.end?.dateTime).toLocaleString()}
                           </p>
                         </div>
-                        <button onClick={() => deleteEvent(e.id)} className="p-2 text-ink-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition shrink-0 cursor-pointer">
-                          <Trash2 size={16} />
-                        </button>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={() => openEditEvent(e)} className="p-2 text-ink-muted hover:text-accent hover:bg-accent/10 rounded-lg transition cursor-pointer">
+                            <Pencil size={15} />
+                          </button>
+                          <button onClick={() => deleteEvent(e.id)} className="p-2 text-ink-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition cursor-pointer">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </motion.div>
                     ))
                   )}
@@ -572,12 +666,43 @@ export default function App() {
                         >
                           {t.status === "completed" && <span className="text-xs font-bold">✓</span>}
                         </button>
-                        <span className={`text-sm font-medium flex-1 ${t.status === "completed" ? "line-through text-ink-muted" : "text-ink"}`}>
-                          {t.title}
-                        </span>
-                        <button onClick={() => deleteTodo(t.id)} className="p-2 text-ink-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition shrink-0 cursor-pointer">
-                          <Trash2 size={16} />
-                        </button>
+
+                        {editingTodoId === t.id ? (
+                          <>
+                            <input
+                              autoFocus
+                              type="text"
+                              value={editingTodoText}
+                              onChange={(e) => setEditingTodoText(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") updateTodoTitle(t.id, editingTodoText);
+                                if (e.key === "Escape") setEditingTodoId(null);
+                              }}
+                              className="flex-1 bg-surface border border-accent/50 rounded-lg px-3 py-1.5 text-sm text-ink focus:outline-none"
+                            />
+                            <button onClick={() => updateTodoTitle(t.id, editingTodoText)} className="p-2 text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition shrink-0 cursor-pointer">
+                              <Check size={16} />
+                            </button>
+                            <button onClick={() => setEditingTodoId(null)} className="p-2 text-ink-muted hover:bg-surface-2 rounded-lg transition shrink-0 cursor-pointer">
+                              <X size={16} />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <span className={`text-sm font-medium flex-1 ${t.status === "completed" ? "line-through text-ink-muted" : "text-ink"}`}>
+                              {t.title}
+                            </span>
+                            <button
+                              onClick={() => { setEditingTodoId(t.id); setEditingTodoText(t.title); }}
+                              className="p-2 text-ink-muted hover:text-accent hover:bg-accent/10 rounded-lg transition shrink-0 cursor-pointer"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                            <button onClick={() => deleteTodo(t.id)} className="p-2 text-ink-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition shrink-0 cursor-pointer">
+                              <Trash2 size={16} />
+                            </button>
+                          </>
+                        )}
                       </motion.div>
                     ))
                   )}
