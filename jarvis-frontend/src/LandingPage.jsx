@@ -1,33 +1,35 @@
-/**
- * Refactored Production Landing Page Component
- * ===========================================
- * Fixes:
- * - Dynamic theme accent sync inside requestAnimationFrame loop
- * - Corrected responsive Tailwind arbitrary dimensions
- * - Enhanced mobile viewport stacking & accessibility focus states
- */
+import React, { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  ArrowRight,
+  Mail,
+  Calendar,
+  CheckSquare,
+  ShieldCheck,
+  Terminal,
+  Sparkles,
+  Lock,
+  Cpu,
+} from "lucide-react";
+import Logo from "./Logo";
+import { ThemeToggle } from "./ThemeToggle";
 
-import React, { useEffect, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
-import { Mail, Calendar, CheckSquare, ArrowRight, ShieldCheck, Sparkles } from 'lucide-react';
-import { ThemeToggle } from './ThemeToggle';
-import Logo from './Logo.jsx';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "https://jarvis-backend-h38f.onrender.com";
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "https://jarvis-backend-h38f.onrender.com";
 
 function getAccentRGB() {
-  if (typeof window === "undefined") return [139, 92, 246];
-  const probe = document.createElement('div');
-  probe.style.color = 'var(--color-accent)';
-  probe.style.display = 'none';
+  if (typeof window === "undefined") return [139, 124, 255];
+  const probe = document.createElement("div");
+  probe.style.color = "var(--color-accent)";
+  probe.style.display = "none";
   document.body.appendChild(probe);
   const resolved = getComputedStyle(probe).color;
   document.body.removeChild(probe);
   const match = resolved.match(/\d+/g);
-  return match ? match.slice(0, 3).map(Number) : [139, 92, 246];
+  return match ? match.slice(0, 3).map(Number) : [139, 124, 255];
 }
 
-const Interactive3DCore = () => {
+function Interactive3DCore({ isDark }) {
   const canvasRef = useRef(null);
   const wrapperRef = useRef(null);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
@@ -46,7 +48,7 @@ const Interactive3DCore = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     let animationFrameId;
@@ -61,7 +63,7 @@ const Interactive3DCore = () => {
     const height = displaySize;
 
     const particles = [];
-    const numParticles = 130;
+    const numParticles = 125;
     const radius = 95;
 
     for (let i = 0; i < numParticles; i++) {
@@ -74,16 +76,15 @@ const Interactive3DCore = () => {
       });
     }
 
-    const angleX = 0.005;
-    const angleY = 0.008;
+    const angleX = 0.012;
+    const angleY = 0.018;
+
+    const [ar, ag, ab] = getAccentRGB();
 
     const render = () => {
       ctx.clearRect(0, 0, width, height);
       const centerX = width / 2;
       const centerY = height / 2;
-
-      // Real-time theme accent update inside loop
-      const [ar, ag, ab] = getAccentRGB();
 
       particles.forEach((p) => {
         const x1 = p.x * Math.cos(angleY) - p.z * Math.sin(angleY);
@@ -107,10 +108,17 @@ const Interactive3DCore = () => {
         ctx.fill();
       });
 
-      const gradient = ctx.createRadialGradient(centerX, centerY, 10, centerX, centerY, 80);
+      const gradient = ctx.createRadialGradient(
+        centerX,
+        centerY,
+        10,
+        centerX,
+        centerY,
+        80
+      );
       gradient.addColorStop(0, `rgba(${ar}, ${ag}, ${ab}, 0.35)`);
       gradient.addColorStop(0.6, `rgba(${ar}, ${ag}, ${ab}, 0.1)`);
-      gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
 
       ctx.fillStyle = gradient;
       ctx.beginPath();
@@ -123,7 +131,7 @@ const Interactive3DCore = () => {
     render();
 
     return () => cancelAnimationFrame(animationFrameId);
-  }, []);
+  }, [isDark]);
 
   return (
     <div
@@ -131,8 +139,11 @@ const Interactive3DCore = () => {
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       style={{ perspective: 900 }}
-      className="relative flex items-center justify-center w-72 h-72 md:w-96 md:h-96"
+      className="relative flex items-center justify-center w-72 h-72 md:w-96 md:h-96 mb-6 select-none"
     >
+      <div className="absolute w-[300px] h-[300px] md:w-[380px] md:h-[380px] rounded-full bg-gradient-to-r from-accent/30 via-[color:var(--color-glow-2)]/30 to-accent/20 blur-3xl opacity-80 pointer-events-none -z-10" />
+      <div className="absolute w-[270px] h-[270px] md:w-[330px] md:h-[330px] rounded-full orbit-aura-ring opacity-40 pointer-events-none -z-10" />
+
       <motion.div
         animate={{ rotateX: tilt.x, rotateY: tilt.y }}
         transition={{ type: "spring", stiffness: 120, damping: 14 }}
@@ -148,7 +159,7 @@ const Interactive3DCore = () => {
           animate={{ y: [0, -6, 0] }}
           transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
           style={{ transform: "translateZ(50px)" }}
-          className="absolute top-4 right-4 z-20 p-2.5 rounded-2xl bg-surface/80 backdrop-blur-xl border border-border shadow-xl text-accent"
+          className="absolute top-4 right-4 z-20 p-2.5 rounded-2xl bg-surface/80 backdrop-blur-xl border border-border/80 shadow-xl text-accent"
         >
           <Mail className="w-4 h-4 md:w-5 md:h-5" />
         </motion.div>
@@ -157,7 +168,7 @@ const Interactive3DCore = () => {
           animate={{ y: [0, 6, 0] }}
           transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
           style={{ transform: "translateZ(50px)" }}
-          className="absolute bottom-6 left-2 z-20 p-2.5 rounded-2xl bg-surface/80 backdrop-blur-xl border border-border shadow-xl text-accent"
+          className="absolute bottom-6 left-2 z-20 p-2.5 rounded-2xl bg-surface/80 backdrop-blur-xl border border-border/80 shadow-xl text-accent"
         >
           <Calendar className="w-4 h-4 md:w-5 md:h-5" />
         </motion.div>
@@ -166,151 +177,266 @@ const Interactive3DCore = () => {
           animate={{ y: [0, -5, 0] }}
           transition={{ repeat: Infinity, duration: 3.5, ease: "easeInOut" }}
           style={{ transform: "translateZ(50px)" }}
-          className="absolute top-1/2 left-0 -translate-y-1/2 z-20 p-2.5 rounded-2xl bg-surface/80 backdrop-blur-xl border border-border shadow-xl text-accent"
+          className="absolute top-1/2 left-0 -translate-y-1/2 z-20 p-2.5 rounded-2xl bg-surface/80 backdrop-blur-xl border border-border/80 shadow-xl text-accent"
         >
-          <CheckSquare className="w-4 h-4 md:w-5 md:h-5" />
+          <CheckSquare className="w-4 h-4 md:w-5 md:h-5 text-emerald-400" />
         </motion.div>
       </motion.div>
     </div>
   );
-};
+}
 
 const features = [
   {
     icon: Mail,
-    eyebrow: "MAILBOX",
+    label: "Mailbox",
     title: "Reads, never sends without you",
     body: "Ask Jarvis to summarize your inbox or draft a reply. Every draft waits safely in Outlook for your review.",
   },
   {
     icon: Calendar,
-    eyebrow: "CALENDAR",
+    label: "Calendar",
     title: "Full control over schedule",
     body: "Create, reschedule, or cancel events by describing them in natural conversational language.",
   },
   {
     icon: CheckSquare,
-    eyebrow: "TASKS",
-    title: "Your Microsoft To Do, spoken",
+    label: "Tasks",
+    title: "Your Microsoft To-Do, spoken",
     body: "Add, complete, or reorganize tasks in a single prompt without manual form filing.",
   },
 ];
 
-function FeatureCard({ icon: Icon, eyebrow, title, body, index }) {
+function FeatureCard({ icon: Icon, label, title, body, index }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 30 }}
+      initial={{ opacity: 0, y: 40 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.3 }}
-      transition={{ duration: 0.5, delay: index * 0.1, ease: "easeOut" }}
-      whileHover={{ y: -4 }}
-      className="group relative p-6 md:p-8 rounded-3xl bg-surface/70 backdrop-blur-xl border border-border/80 overflow-hidden text-left shadow-xl transition-all duration-300 hover:border-accent/40"
+      viewport={{ once: true, amount: 0.4 }}
+      transition={{ duration: 0.5, delay: index * 0.12, ease: [0.16, 1, 0.3, 1] }}
+      whileHover={{ y: -6 }}
+      className="card-energy-ring group relative p-6 rounded-3xl bg-surface/60 backdrop-blur-md border border-border/70 overflow-hidden text-left transition-all duration-300 shadow-lg shadow-black/20"
     >
-      <div className="pointer-events-none absolute -inset-1 rounded-3xl bg-accent/0 group-hover:bg-accent/5 blur-xl transition-all duration-500" />
+      <div className="pointer-events-none absolute -inset-1 rounded-3xl bg-accent/0 group-hover:bg-accent/[0.08] blur-xl transition-all duration-500" />
 
-      <div className="relative w-11 h-11 rounded-2xl bg-accent/10 flex items-center justify-center text-accent mb-5">
-        <Icon className="w-5 h-5" />
-      </div>
-      <span className="relative font-mono text-[11px] font-bold uppercase tracking-wider text-accent mb-1.5 block">
-        {eyebrow}
+      <motion.div
+        whileHover={{ rotate: [0, -8, 8, 0], scale: 1.08 }}
+        transition={{ duration: 0.5 }}
+        className="relative w-10 h-10 rounded-2xl bg-accent/15 flex items-center justify-center text-accent mb-4 border border-accent/20"
+      >
+        <Icon size={20} />
+      </motion.div>
+      <span className="relative text-[10px] font-mono uppercase tracking-wider font-semibold block mb-1 text-accent">
+        {label}
       </span>
-      <h3 className="relative font-display text-lg font-bold mb-2 text-ink">{title}</h3>
-      <p className="relative text-xs md:text-sm text-ink-muted leading-relaxed">{body}</p>
+      <h3 className="relative font-display text-base font-bold mb-2">{title}</h3>
+      <p className="relative text-xs leading-relaxed text-ink-muted">{body}</p>
     </motion.div>
   );
 }
 
 export default function LandingPage({ onLogin, isDark, setIsDark }) {
-  const handleLogin = onLogin || (() => {
-    window.location.href = `${API_BASE_URL}/api/auth/login`;
-  });
+  const [activeTab, setActiveTab] = useState("mail");
+
+  const handleLogin =
+    onLogin ||
+    (() => {
+      window.location.href = `${API_BASE_URL}/api/auth/login`;
+    });
+
+  const samplePrompts = {
+    mail: {
+      prompt: "Draft a follow-up email to Alex regarding yesterday's project review.",
+      status: "Reading recent thread context from Outlook...",
+      action: "Draft generated and saved in Outlook Drafts.",
+    },
+    calendar: {
+      prompt: "Schedule a 30-min sync with Alex tomorrow at 3 PM.",
+      status: "Resolving 'tomorrow 3pm' against your local timezone...",
+      action: "Calendar event created on your Outlook calendar.",
+    },
+    tasks: {
+      prompt: "Add 'Review Q3 financial roadmap' to my priority tasks.",
+      status: "Syncing with Microsoft To-Do...",
+      action: "Task added to your Microsoft To-Do list.",
+    },
+  };
 
   return (
-    <div className="min-h-screen bg-bg text-ink transition-colors duration-500 overflow-hidden relative selection:bg-accent/30">
-      <div className="absolute inset-0 bg-grid-scan pointer-events-none [mask-image:radial-gradient(ellipse_60%_60%_at_50%_20%,black,transparent)]" />
-
-      {/* Standardized Tailwind Gradient Widths */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-accent/10 blur-[130px] pointer-events-none" />
-
+    <div className="relative min-h-screen bg-bg text-ink transition-colors duration-300 flex flex-col items-center justify-between overflow-hidden selection:bg-accent/30">
+      
       {/* Header */}
-      <header className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between relative z-30">
-        <div className="flex items-center gap-2.5">
-          <Logo size={34} />
-          <span className="font-display text-xl font-bold tracking-tight text-ink">
-            Jarvis
-          </span>
+      <header className="relative z-20 max-w-5xl w-full px-6 py-5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Logo size={32} />
+          <span className="font-display font-bold text-lg tracking-tight text-glow">Jarvis</span>
         </div>
-
         <ThemeToggle isDark={isDark} setIsDark={setIsDark} />
       </header>
 
-      {/* Hero Section */}
-      <main className="max-w-5xl mx-auto px-6 pt-4 pb-20 relative z-20 flex flex-col items-center text-center">
+      {/* Main Content Hero */}
+      <main className="relative z-10 max-w-4xl w-full px-6 pt-4 pb-20 flex flex-col items-center text-center">
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="font-mono inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-accent/10 border border-accent/20 text-accent text-[11px] font-semibold uppercase tracking-widest mb-6 backdrop-blur-md"
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          Autonomous Assistant for M365
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6 }}
-          className="mb-6"
-        >
-          <Interactive3DCore />
-        </motion.div>
-
-        <motion.h1
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="font-display text-2xl md:text-4xl lg:text-5xl font-bold tracking-tight max-w-3xl leading-[1.18] mb-4 text-ink"
+          className="font-mono inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-accent/30 bg-accent/15 text-accent text-xs uppercase tracking-widest mb-6 backdrop-blur-md shadow-sm"
         >
-          Your inbox, calendar, and to-dos —{' '}
-          <span className="bg-clip-text text-transparent bg-gradient-to-r from-accent via-purple-500 to-accent">
+          <Sparkles size={13} className="animate-pulse" />
+          <span>Autonomous Assistant for M365</span>
+        </motion.div>
+
+        {/* 3D Particle Orbit Core Visualizer */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.8 }}
+        >
+          <Interactive3DCore isDark={isDark} />
+        </motion.div>
+
+        {/* Headline */}
+        <motion.h1
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="font-display text-3xl sm:text-5xl font-extrabold tracking-tight max-w-2xl leading-tight"
+        >
+          Your inbox, calendar, and to-dos —{" "}
+          <span className="text-glow-gradient bg-linear-to-r from-accent via-accent to-[color:var(--color-glow-2)] bg-clip-text text-transparent">
             one prompt away.
           </span>
         </motion.h1>
 
         <motion.p
-          initial={{ opacity: 0, y: 15 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
-          className="text-sm md:text-base text-ink-muted max-w-xl font-normal leading-relaxed mb-8"
+          transition={{ delay: 0.3 }}
+          className="mt-4 text-sm sm:text-base max-w-lg leading-relaxed text-ink-muted"
         >
-          Tell Jarvis what you need. It reasons over your requests and acts directly on Outlook Mail, Calendar, and To-Do with complete precision.
+          Tell Jarvis what you need. It reasons over requests and acts directly on
+          Outlook Mail, Calendar, and To-Do with complete precision.
         </motion.p>
 
-        {/* Primary CTA */}
+        {/* Sign-in Button */}
         <motion.div
-          initial={{ opacity: 0, y: 15 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
-          className="flex flex-col items-center gap-3"
+          transition={{ delay: 0.4 }}
+          className="mt-7 flex flex-col items-center gap-3"
         >
-          <button
-            onClick={handleLogin}
-            className="group relative inline-flex items-center gap-3 px-7 py-3.5 rounded-2xl bg-accent text-accent-ink font-semibold text-base shadow-xl shadow-accent/20 hover:opacity-95 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
-          >
-            <span>Sign in with Microsoft</span>
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-          </button>
+          <div className="relative">
+            <div className="btn-halo absolute -inset-3 rounded-[28px] blur-2xl pointer-events-none" />
+            <div className="btn-energy-ring rounded-2xl relative">
+              <button
+                onClick={handleLogin}
+                className="group relative inline-flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-2xl bg-accent text-accent-ink font-semibold text-sm shadow-lg shadow-accent/30 transition-all duration-300 hover:scale-[1.03] hover:shadow-2xl hover:shadow-accent/50 active:scale-95 cursor-pointer"
+              >
+                <span>Sign in with Microsoft</span>
+                <ArrowRight size={16} className="transition-transform duration-200 group-hover:translate-x-1" />
+              </button>
+            </div>
+          </div>
 
-          <span className="font-mono flex items-center gap-1.5 text-[11px] text-ink-muted font-medium mt-1">
-            <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            Authenticated via Microsoft Entra ID
-          </span>
+          <div className="flex items-center gap-1.5 text-[11px] font-mono text-ink-muted">
+            <ShieldCheck size={13} className="text-emerald-400" />
+            <span>Authenticated via Microsoft Entra ID</span>
+          </div>
         </motion.div>
 
-        {/* Features Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 w-full max-w-4xl mt-16">
+        {/* Feature Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-16 w-full">
           {features.map((f, i) => (
-            <FeatureCard key={f.title} index={i} {...f} />
+            <FeatureCard key={f.label} index={i} {...f} />
           ))}
+        </div>
+
+        {/* ================= TERMIAL PLAYGROUND WITH FUTURISTIC GLOW ================= */}
+        <div className="relative mt-16 w-full">
+          {/* Dual Volumetric Light Source behind the Terminal */}
+          <div className="absolute -top-12 left-1/4 w-[400px] h-[250px] bg-accent/25 blur-[100px] rounded-full pointer-events-none -z-10" />
+          <div className="absolute -bottom-10 right-1/4 w-[400px] h-[250px] bg-[color:var(--color-glow-2)]/20 blur-[110px] rounded-full pointer-events-none -z-10" />
+
+          <div className="relative p-6 sm:p-8 rounded-3xl border border-accent/30 bg-surface/80 backdrop-blur-2xl text-left shadow-2xl shadow-accent/10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-border/80">
+              <div>
+                <h3 className="font-display text-base font-bold flex items-center gap-2 text-glow">
+                  <Terminal size={18} className="text-accent" />
+                  <span>See Jarvis in Action</span>
+                </h3>
+                <p className="text-xs mt-1 text-ink-muted">
+                  Select a workflow to preview how a request resolves through Microsoft Graph.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-1.5 p-1 rounded-2xl border border-border/80 bg-surface-2/90">
+                {["mail", "calendar", "tasks"].map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold capitalize transition duration-200 cursor-pointer ${
+                      activeTab === tab ? "bg-accent text-accent-ink shadow-md shadow-accent/30" : "text-ink-muted hover:text-ink"
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-5 p-4 sm:p-5 rounded-2xl border border-border/80 bg-surface-2/90 font-mono text-xs overflow-hidden shadow-inner">
+              <div className="flex items-center justify-between text-ink-muted mb-3 border-b border-border/60 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500/80 inline-block" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/80 inline-block" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
+                  <span className="ml-2 text-[10px] font-sans text-ink-muted/80">jarvis-agent-executor</span>
+                </div>
+                <div className="flex items-center gap-1 text-[10px] text-accent font-semibold">
+                  <Cpu size={12} className="animate-pulse" />
+                  <span>Active</span>
+                </div>
+              </div>
+
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.15 }}
+                  className="space-y-2.5"
+                >
+                  <p className="text-accent">
+                    <span className="text-ink-muted">$</span> prompt --input{" "}
+                    <span className="text-ink font-sans font-medium">"{samplePrompts[activeTab].prompt}"</span>
+                  </p>
+                  <div className="mt-2.5 space-y-2 pl-3 border-l-2 border-accent/50">
+                    <p className="text-emerald-400 flex items-center gap-2">
+                      <span>✓</span> Intent parsed and entities resolved.
+                    </p>
+                    <p className="text-ink-muted flex items-center gap-2">
+                      <span className="animate-pulse text-amber-400">⚡</span> {samplePrompts[activeTab].status}
+                    </p>
+                    <p className="text-accent font-semibold flex items-center gap-2">
+                      <span>→</span> {samplePrompts[activeTab].action}
+                    </p>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Note */}
+        <div className="mt-14 flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs font-mono text-ink-muted">
+          <div className="flex items-center gap-1.5">
+            <Lock size={13} className="text-accent" />
+            <span>Tokens Encrypted at Rest</span>
+          </div>
+          <span className="opacity-40">•</span>
+          <div>OAuth2 Encrypted Session</div>
+          <span className="opacity-40">•</span>
+          <div>Microsoft Graph Native</div>
         </div>
       </main>
     </div>

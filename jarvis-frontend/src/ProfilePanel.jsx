@@ -1,170 +1,143 @@
 /**
- * Profile Panel Component
- * =======================
- * Floating dropdown interface to manage user preferences:
- * - Display name editing
- * - Accent color selection & persistence
- * - Dark / Light theme toggles
- * - Account disconnect trigger
+ * ProfilePanel Component
+ * ======================
+ * Flyout/modal panel for user settings, dark mode toggle,
+ * accent color customization, and account management.
  */
 
-import React, { useState, useEffect, useRef } from "react";
-import { X, Sun, Moon, LogOut, Check } from "lucide-react";
+import React, { useState } from "react";
+import { X, Sun, Moon, Check, LogOut, User, Palette } from "lucide-react";
 
-export const ACCENTS = [
-  { id: "violet", label: "Violet", light: "#5B3DF5", dark: "#8B7CFF", cssVar: "8B7CFF" },
-  { id: "emerald", label: "Emerald", light: "#059669", dark: "#34D399", cssVar: "34D399" },
-  { id: "rose", label: "Rose", light: "#E11D48", dark: "#FB7185", cssVar: "FB7185" },
-  { id: "sky", label: "Sky", light: "#0284C7", dark: "#38BDF8", cssVar: "38BDF8" },
+// Predefined accent color options mapping to CSS theme variables
+export const ACCENT_PRESETS = [
+  { id: "indigo", label: "Indigo", value: "#6366f1", ink: "#ffffff" },
+  { id: "emerald", label: "Emerald", value: "#10b981", ink: "#ffffff" },
+  { id: "violet", label: "Violet", value: "#8b5cf6", ink: "#ffffff" },
+  { id: "rose", label: "Rose", value: "#f43f5e", ink: "#ffffff" },
+  { id: "amber", label: "Amber", value: "#f59e0b", ink: "#000000" },
+  { id: "cyan", label: "Cyan", value: "#06b6d4", ink: "#000000" },
 ];
 
 /**
- * Reads local storage preference and sets root document CSS accent variable.
+ * Reads local storage for saved accent colors and updates CSS root variables.
  */
 export function applyStoredAccent() {
-  const saved = localStorage.getItem("jarvis_accent") || "violet";
-  const preset = ACCENTS.find((a) => a.id === saved) || ACCENTS[0];
-  const isDarkTheme = document.documentElement.classList.contains("dark");
-  
-  document.documentElement.style.setProperty(
-    "--color-accent",
-    isDarkTheme ? preset.dark : preset.light
-  );
-  return saved;
+  if (typeof window === "undefined") return;
+  const savedAccent = localStorage.getItem("jarvis_accent_color");
+  const savedInk = localStorage.getItem("jarvis_accent_ink");
+
+  if (savedAccent) {
+    document.documentElement.style.setProperty("--color-accent", savedAccent);
+  }
+  if (savedInk) {
+    document.documentElement.style.setProperty("--color-accent-ink", savedInk);
+  }
 }
 
 export default function ProfilePanel({ email, isDark, setIsDark, onLogout, onClose }) {
-  const [displayName, setDisplayName] = useState(
-    () => localStorage.getItem("jarvis_display_name") || (email ? email.split("@")[0] : "User")
-  );
-  const [accent, setAccent] = useState(() => localStorage.getItem("jarvis_accent") || "violet");
-  const panelRef = useRef(null);
+  const [selectedAccent, setSelectedAccent] = useState(() => {
+    return localStorage.getItem("jarvis_accent_id") || "indigo";
+  });
 
-  // Sync display name if email prop loads asynchronously
-  useEffect(() => {
-    if (!localStorage.getItem("jarvis_display_name") && email) {
-      setDisplayName(email.split("@")[0]);
-    }
-  }, [email]);
+  const [displayName, setDisplayName] = useState(() => {
+    return localStorage.getItem("jarvis_display_name") || email.split("@")[0];
+  });
 
-  // Click outside to close panel listener
-  useEffect(() => {
-    const handleClick = (e) => {
-      if (panelRef.current && !panelRef.current.contains(e.target)) {
-        onClose();
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [onClose]);
+  const handleAccentChange = (preset) => {
+    setSelectedAccent(preset.id);
+    localStorage.setItem("jarvis_accent_id", preset.id);
+    localStorage.setItem("jarvis_accent_color", preset.value);
+    localStorage.setItem("jarvis_accent_ink", preset.ink);
 
-  const saveDisplayName = (val) => {
+    document.documentElement.style.setProperty("--color-accent", preset.value);
+    document.documentElement.style.setProperty("--color-accent-ink", preset.ink);
+  };
+
+  const handleNameChange = (e) => {
+    const val = e.target.value;
     setDisplayName(val);
     localStorage.setItem("jarvis_display_name", val);
   };
 
-  const chooseAccent = (id) => {
-    setAccent(id);
-    localStorage.setItem("jarvis_accent", id);
-    const preset = ACCENTS.find((a) => a.id === id) || ACCENTS[0];
-    document.documentElement.style.setProperty(
-      "--color-accent",
-      isDark ? preset.dark : preset.light
-    );
-  };
-
   return (
-    <div
-      ref={panelRef}
-      className="absolute bottom-full left-0 mb-3 w-full bg-surface border border-border rounded-2xl shadow-2xl p-5 z-30 animate-fade-up"
-      style={{ animationDuration: "0.18s" }}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <span className="font-display font-semibold text-sm text-ink">Profile</span>
+    <div className="absolute bottom-16 left-0 right-0 mb-2 w-80 bg-surface/95 backdrop-blur-2xl border border-border shadow-2xl rounded-3xl p-5 z-50 animate-in fade-in slide-in-from-bottom-3 duration-200">
+      <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-border/80">
+        <div className="flex items-center gap-2 font-display font-semibold text-sm text-ink">
+          <User size={16} className="text-accent" />
+          <span>Profile & Preferences</span>
+        </div>
         <button
           onClick={onClose}
-          className="text-ink-muted hover:text-ink transition p-1 rounded-lg hover:bg-surface-2 cursor-pointer"
+          className="p-1 rounded-lg text-ink-muted hover:text-ink hover:bg-surface-2 transition cursor-pointer"
         >
           <X size={16} />
         </button>
       </div>
 
-      {/* User Info Avatar & Editable Name */}
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-12 h-12 rounded-2xl bg-accent/15 border border-accent/30 flex items-center justify-center text-accent font-display font-bold text-lg shrink-0">
-          {displayName[0]?.toUpperCase() || "U"}
-        </div>
-        <div className="min-w-0 flex-1">
+      <div className="space-y-4 text-xs">
+        {/* User Info & Display Name */}
+        <div>
+          <label className="block text-[11px] font-bold uppercase tracking-wider text-ink-muted mb-1.5">
+            Display Name
+          </label>
           <input
             type="text"
             value={displayName}
-            onChange={(e) => saveDisplayName(e.target.value)}
-            className="w-full bg-transparent border-b border-transparent hover:border-border focus:border-accent text-sm font-semibold text-ink focus:outline-none transition-colors p-0.5"
-            placeholder="Display name"
+            onChange={handleNameChange}
+            className="w-full bg-surface-2 border border-border rounded-xl px-3 py-2 text-ink text-xs focus:outline-none focus:border-accent"
           />
-          <p className="text-xs text-ink-muted truncate px-0.5 mt-0.5">{email}</p>
+          <span className="text-[10px] text-ink-muted mt-1 block truncate">
+            {email}
+          </span>
         </div>
-      </div>
 
-      {/* Accent Selector */}
-      <div className="mb-5">
-        <p className="text-[11px] font-mono uppercase tracking-wider text-ink-muted mb-2.5">Accent color</p>
-        <div className="flex gap-2.5">
-          {ACCENTS.map((a) => {
-            const isSelected = accent === a.id;
-            const bgValue = isDark ? a.dark : a.light;
-            return (
-              <button
-                key={a.id}
-                onClick={() => chooseAccent(a.id)}
-                title={a.label}
-                className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition cursor-pointer active:scale-95 ${
-                  isSelected ? "border-ink scale-105" : "border-transparent"
-                }`}
-                style={{ backgroundColor: bgValue }}
-              >
-                {isSelected && <Check size={13} className="text-white drop-shadow-md" />}
-              </button>
-            );
-          })}
+        {/* Accent Color Picker */}
+        <div>
+          <label className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-ink-muted mb-2">
+            <Palette size={13} className="text-accent" />
+            <span>Accent Theme</span>
+          </label>
+          <div className="grid grid-cols-6 gap-2">
+            {ACCENT_PRESETS.map((preset) => {
+              const isSelected = selectedAccent === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  onClick={() => handleAccentChange(preset)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center transition-transform active:scale-95 cursor-pointer relative"
+                  style={{ backgroundColor: preset.value }}
+                  title={preset.label}
+                >
+                  {isSelected && (
+                    <Check size={14} style={{ color: preset.ink }} />
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
 
-      {/* Theme Option Selector */}
-      <div className="mb-5">
-        <p className="text-[11px] font-mono uppercase tracking-wider text-ink-muted mb-2.5">Appearance</p>
-        <div className="flex gap-2">
+        {/* Appearance Mode */}
+        <div className="pt-2 border-t border-border/80 flex items-center justify-between">
+          <span className="font-medium text-ink">Dark Appearance</span>
           <button
-            onClick={() => setIsDark(false)}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-medium border transition cursor-pointer ${
-              !isDark
-                ? "bg-surface-2 border-accent/50 text-ink shadow-sm"
-                : "border-border text-ink-muted hover:bg-surface-2/40"
-            }`}
+            onClick={() => setIsDark(!isDark)}
+            className="p-2 rounded-xl bg-surface-2 border border-border text-ink hover:text-accent transition cursor-pointer"
           >
-            <Sun size={14} /> Light
+            {isDark ? <Moon size={15} /> : <Sun size={15} />}
           </button>
+        </div>
+
+        {/* Account Disconnect */}
+        <div className="pt-2 border-t border-border/80">
           <button
-            onClick={() => setIsDark(true)}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-medium border transition cursor-pointer ${
-              isDark
-                ? "bg-surface-2 border-accent/50 text-ink shadow-sm"
-                : "border-border text-ink-muted hover:bg-surface-2/40"
-            }`}
+            onClick={onLogout}
+            className="w-full flex items-center justify-center gap-2 py-2 text-red-500 hover:bg-red-500/10 rounded-xl transition font-semibold cursor-pointer"
           >
-            <Moon size={14} /> Dark
+            <LogOut size={14} /> Sign Out
           </button>
         </div>
       </div>
-
-      {/* Account Logout Action */}
-      <button
-        onClick={onLogout}
-        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-red-500 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 rounded-xl transition-all cursor-pointer"
-      >
-        <LogOut size={15} /> Disconnect Account
-      </button>
     </div>
   );
 }

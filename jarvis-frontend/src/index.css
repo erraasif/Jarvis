@@ -1,6 +1,5 @@
 @import "tailwindcss";
 
-/* Manual light/dark toggle via a class on <html>, rather than only OS preference */
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
@@ -8,142 +7,128 @@
   --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
-  /* Deep indigo/violet system instead of a generic blue SaaS palette */
-  --color-bg: light-dark(#F6F4F1, #0A0A12);
-  --color-surface: light-dark(#FFFFFF, #13131F);
-  --color-surface-2: light-dark(#F0EDE7, #191927);
-  --color-border: light-dark(#E3DFD7, #262635);
-  --color-ink: light-dark(#17151F, #ECEAF6);
-  --color-ink-muted: light-dark(#68636F, #9490A6);
+  /* Rich Obsidian-Violet System */
+  --color-bg: light-dark(#F4F2EE, #0B0914);
+  --color-surface: light-dark(#FFFFFF, #131124);
+  --color-surface-2: light-dark(#EFECE6, #1A172E);
+  --color-border: light-dark(#E0DDD5, #292440);
+  --color-ink: light-dark(#161420, #EDEBFB);
+  --color-ink-muted: light-dark(#666170, #958FA8);
   --color-accent: light-dark(#5B3DF5, #8B7CFF);
-  --color-accent-ink: light-dark(#FFFFFF, #0A0A12);
-  --color-amber: light-dark(#B45309, #F2A93B);
+  --color-accent-ink: light-dark(#FFFFFF, #0A0814);
+  --color-glow-2: light-dark(#0EA5E9, #22D3EE);
 }
 
-:root {
-  color-scheme: light;
-}
-html.dark {
-  color-scheme: dark;
-}
-
-* {
-  box-sizing: border-box;
-}
+:root { color-scheme: light; }
+html.dark { color-scheme: dark; }
+* { box-sizing: border-box; }
 
 body {
-  margin: 0;
-  padding: 0;
+  margin: 0; 
+  padding: 0; 
   min-height: 100vh;
   background-color: var(--color-bg);
   color: var(--color-ink);
   font-family: var(--font-body);
+  position: relative;
+  overflow-x: hidden;
 }
 
-/* Signature landing animation: three service nodes orbiting the Jarvis mark */
-@keyframes orbit-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-@keyframes orbit-spin-reverse {
-  from { transform: rotate(360deg); }
-  to { transform: rotate(0deg); }
-}
-.orbit-ring {
-  animation: orbit-spin linear infinite;
-}
-.orbit-node {
-  animation: orbit-spin-reverse linear infinite;
+/* ==========================================================================
+   GLOBAL MESH LIGHTING & FUTURISTIC ATMOSPHERE
+   ========================================================================== */
+
+/* Multi-Layered Volumetric Backdrop (No pitch black, pure glowing depth) */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background: 
+    radial-gradient(ellipse 90% 60% at 50% -10%, color-mix(in srgb, var(--color-accent) 26%, transparent), transparent 70%),
+    radial-gradient(circle 800px at 85% 35%, color-mix(in srgb, var(--color-glow-2) 16%, transparent), transparent 75%),
+    radial-gradient(circle 900px at 15% 65%, color-mix(in srgb, var(--color-accent) 18%, transparent), transparent 80%),
+    radial-gradient(ellipse 80% 50% at 50% 105%, color-mix(in srgb, var(--color-glow-2) 20%, transparent), transparent 70%);
 }
 
-@keyframes fade-up {
-  from { opacity: 0; transform: translateY(14px); }
-  to { opacity: 1; transform: translateY(0); }
+/* Drifting Ambient Glowing Aura Blobs */
+@keyframes bg-drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.8; }
+  50% { transform: translate(60px, -40px) scale(1.15); opacity: 1; }
 }
-.animate-fade-up {
-  animation: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-@keyframes glow-pulse {
-  0%, 100% { opacity: 0.55; }
-  50% { opacity: 0.9; }
-}
-.animate-glow-pulse {
-  animation: glow-pulse 4s ease-in-out infinite;
+@keyframes bg-drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.7; }
+  50% { transform: translate(-70px, 50px) scale(1.2); opacity: 0.95; }
 }
 
-.logo-node {
-  animation: node-pulse 2.4s ease-in-out infinite;
-  transform-origin: 11px 25.6px;
-}
-@keyframes node-pulse {
-  0%, 100% { opacity: 0.75; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.35); }
-}
+.bg-ambient-1 { animation: bg-drift-1 16s ease-in-out infinite; }
+.bg-ambient-2 { animation: bg-drift-2 20s ease-in-out infinite; }
 
-/* Glow that sits BEHIND the text as a soft halo — the letters themselves
-   stay crisp and fully opaque, so it reads as "glowing" without hurting
-   legibility the way a blurred text-shadow directly on the glyph would. */
+/* Glowing neon accents */
 .text-glow {
   text-shadow:
-    0 0 1px currentColor,
-    0 0 18px light-dark(rgba(91,61,245,0.35), rgba(139,124,255,0.55)),
-    0 0 40px light-dark(rgba(91,61,245,0.18), rgba(139,124,255,0.28));
+    0 0 2px currentColor,
+    0 0 22px light-dark(rgba(91, 61, 245, 0.45), rgba(139, 124, 255, 0.7)),
+    0 0 50px light-dark(rgba(91, 61, 245, 0.25), rgba(139, 124, 255, 0.4));
 }
 
-/* For gradient/bg-clip-text headlines: text-shadow can't key off a
-   transparent color, so use a pixel-based drop-shadow glow instead. */
 .text-glow-gradient {
   filter:
-    drop-shadow(0 0 14px light-dark(rgba(91,61,245,0.35), rgba(139,124,255,0.5)))
-    drop-shadow(0 0 34px light-dark(rgba(91,61,245,0.15), rgba(139,124,255,0.25)));
+    drop-shadow(0 0 18px light-dark(rgba(91, 61, 245, 0.5), rgba(139, 124, 255, 0.65)))
+    drop-shadow(0 0 45px light-dark(rgba(91, 61, 245, 0.25), rgba(139, 124, 255, 0.38)));
 }
 
-/* Subtle animated grid backdrop for the landing page — color derives from
-   the current accent via color-mix(), so it re-tints automatically when
-   the user changes their accent color, no JS needed. */
-.bg-grid-scan {
-  background-image:
-    linear-gradient(color-mix(in srgb, var(--color-accent) 12%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--color-accent) 12%, transparent) 1px, transparent 1px);
-  background-size: 46px 46px;
-  animation: grid-drift 22s linear infinite;
-}
-@keyframes grid-drift {
-  from { background-position: 0 0; }
-  to { background-position: 46px 46px; }
-}
-
-/* Rotating gradient "energy ring" outline — wraps the CTA button in a
-   thin spinning conic-gradient border. Accent-driven via var(). */
-.btn-energy-ring {
-  position: relative;
-  isolation: isolate;
-}
-.btn-energy-ring::before {
+/* Rotating gradient "energy ring" */
+.btn-energy-ring { position: relative; isolation: isolate; }
+.btn-energy-ring::before,
+.card-energy-ring::before {
   content: "";
   position: absolute;
   inset: -2px;
   border-radius: inherit;
   padding: 2px;
-  background: conic-gradient(from 0deg, transparent 0%, var(--color-accent) 15%, transparent 35%);
+  background: conic-gradient(from 0deg, transparent 0%, var(--color-accent) 15%, var(--color-glow-2) 28%, transparent 42%);
   
-  /* Webkit & Standard Mask Properties for Cross-Browser Compatibility */
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-image: linear-gradient(#000 0 0), linear-gradient(#000 0 0);
+  -webkit-mask-clip: content-box, border-box;
   -webkit-mask-composite: xor;
+
+  mask-image: linear-gradient(#000 0 0), linear-gradient(#000 0 0);
+  mask-clip: content-box, border-box;
   mask-composite: exclude;
-  
+
   animation: spin-ring 2.6s linear infinite;
   pointer-events: none;
 }
-@keyframes spin-ring {
-  to { transform: rotate(360deg); }
+@keyframes spin-ring { to { transform: rotate(360deg); } }
+
+.card-energy-ring { position: relative; isolation: isolate; }
+.card-energy-ring::before { opacity: 0; transition: opacity 0.4s ease; animation-duration: 4s; }
+.card-energy-ring:hover::before { opacity: 1; }
+
+@keyframes button-halo {
+  0%, 100% { opacity: 0.6; transform: scale(0.96); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+.btn-halo {
+  animation: button-halo 3s ease-in-out infinite;
+  background: radial-gradient(circle, var(--color-accent) 0%, var(--color-glow-2) 50%, transparent 75%);
+}
+
+@keyframes aura-spin { to { transform: rotate(360deg); } }
+.orbit-aura-ring {
+  animation: aura-spin 14s linear infinite;
+  background: conic-gradient(from 0deg,
+    color-mix(in srgb, var(--color-accent) 45%, transparent) 0deg,
+    color-mix(in srgb, var(--color-glow-2) 40%, transparent) 120deg,
+    transparent 200deg,
+    color-mix(in srgb, var(--color-accent) 45%, transparent) 360deg);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .orbit-ring, .orbit-node, .animate-fade-up, .animate-glow-pulse, .logo-node,
-  .bg-grid-scan, .btn-energy-ring::before {
+  .btn-energy-ring::before, .card-energy-ring::before,
+  .btn-halo, .orbit-aura-ring, .bg-ambient-1, .bg-ambient-2 {
     animation: none !important;
   }
 }

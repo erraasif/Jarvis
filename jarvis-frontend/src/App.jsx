@@ -661,48 +661,59 @@ export default function App() {
                         <button
                           onClick={() => toggleTodo(t)}
                           className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 cursor-pointer ${
-                            t.status === "completed" ? "bg-accent border-accent text-accent-ink" : "border-border"
+                            t.status === "completed" ? "bg-accent border-accent text-accent-ink" : "border-border hover:border-accent"
                           }`}
                         >
-                          {t.status === "completed" && <span className="text-xs font-bold">✓</span>}
+                          {t.status === "completed" && <Check size={12} />}
                         </button>
 
-                        {editingTodoId === t.id ? (
-                          <>
-                            <input
-                              autoFocus
-                              type="text"
-                              value={editingTodoText}
-                              onChange={(e) => setEditingTodoText(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") updateTodoTitle(t.id, editingTodoText);
-                                if (e.key === "Escape") setEditingTodoId(null);
-                              }}
-                              className="flex-1 bg-surface border border-accent/50 rounded-lg px-3 py-1.5 text-sm text-ink focus:outline-none"
-                            />
-                            <button onClick={() => updateTodoTitle(t.id, editingTodoText)} className="p-2 text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition shrink-0 cursor-pointer">
-                              <Check size={16} />
-                            </button>
-                            <button onClick={() => setEditingTodoId(null)} className="p-2 text-ink-muted hover:bg-surface-2 rounded-lg transition shrink-0 cursor-pointer">
-                              <X size={16} />
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <span className={`text-sm font-medium flex-1 ${t.status === "completed" ? "line-through text-ink-muted" : "text-ink"}`}>
+                        <div className="flex-1 min-w-0">
+                          {editingTodoId === t.id ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={editingTodoText}
+                                onChange={(e) => setEditingTodoText(e.target.value)}
+                                className="flex-1 bg-surface border border-border rounded-lg px-3 py-1 text-sm text-ink focus:outline-none focus:border-accent"
+                                autoFocus
+                              />
+                              <button
+                                onClick={() => updateTodoTitle(t.id, editingTodoText)}
+                                className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition cursor-pointer"
+                              >
+                                <Check size={16} />
+                              </button>
+                              <button
+                                onClick={() => setEditingTodoId(null)}
+                                className="p-1.5 text-ink-muted hover:bg-surface-2 rounded-lg transition cursor-pointer"
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className={`text-sm ${t.status === "completed" ? "line-through text-ink-muted" : "text-ink font-medium"}`}>
                               {t.title}
                             </span>
-                            <button
-                              onClick={() => { setEditingTodoId(t.id); setEditingTodoText(t.title); }}
-                              className="p-2 text-ink-muted hover:text-accent hover:bg-accent/10 rounded-lg transition shrink-0 cursor-pointer"
-                            >
-                              <Pencil size={15} />
-                            </button>
-                            <button onClick={() => deleteTodo(t.id)} className="p-2 text-ink-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition shrink-0 cursor-pointer">
-                              <Trash2 size={16} />
-                            </button>
-                          </>
-                        )}
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => {
+                              setEditingTodoId(t.id);
+                              setEditingTodoText(t.title);
+                            }}
+                            className="p-2 text-ink-muted hover:text-accent hover:bg-accent/10 rounded-lg transition cursor-pointer"
+                          >
+                            <Pencil size={15} />
+                          </button>
+                          <button
+                            onClick={() => deleteTodo(t.id)}
+                            className="p-2 text-ink-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition cursor-pointer"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </motion.div>
                     ))
                   )}

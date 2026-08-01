@@ -10,6 +10,7 @@ import urllib.parse
 import httpx
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import RedirectResponse
+import msal
 
 from app.config import settings
 from app.services.supabase_client import save_user_tokens
