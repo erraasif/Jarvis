@@ -5,6 +5,7 @@ Handles Microsoft Azure AD (Entra ID) OAuth2 authentication flow using MSAL.
 Exchanges authorization codes for access and refresh tokens, saving them securely to Supabase.
 """
 
+from datetime import datetime, timezone, timedelta
 import logging
 import urllib.parse
 import httpx
@@ -80,6 +81,9 @@ def callback(code: str = None, error: str = None, state: str = "UTC"):
     refresh_token = result.get("refresh_token")
     expires_in = result.get("expires_in", 3600)
 
+    # Compute a valid ISO-8601 timestamp string for PostgreSQL / Supabase
+    expires_at = (datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))).isoformat()
+
     # Fetch user identity from Microsoft Graph
     headers = {"Authorization": f"Bearer {access_token}"}
     try:
@@ -92,8 +96,8 @@ def callback(code: str = None, error: str = None, state: str = "UTC"):
     if not user_email:
         raise HTTPException(status_code=400, detail="Could not determine user email from Graph response.")
 
-    # Save tokens to database
-    save_user_tokens(user_email, access_token, refresh_token, expires_in)
+    # Save tokens to database (passing ISO formatted expires_at)
+    save_user_tokens(user_email, access_token, refresh_token, expires_at)
 
     # Decode timezone passed in state parameter
     user_timezone = urllib.parse.quote(state)

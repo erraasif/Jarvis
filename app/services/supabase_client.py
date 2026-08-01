@@ -5,8 +5,7 @@ Manages user authentication tokens (with Fernet encryption/decryption)
 and persists chat history logs.
 """
 
-import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from supabase import create_client, Client
 from cryptography.fernet import Fernet
 from app.config import settings
@@ -30,13 +29,13 @@ def decrypt_token(encrypted_token: str) -> str:
 def save_user_tokens(email: str, access_token: str, refresh_token: str, expires_in: int):
     """
     Persists user tokens into Supabase. 
-    Stores expires_at as a Unix epoch timestamp (in seconds) for quick validation checks.
+    Stores expires_at as an ISO 8601 string for Postgres TIMESTAMPTZ compatibility.
     """
     encrypted_access = encrypt_token(access_token)
     encrypted_refresh = encrypt_token(refresh_token) if refresh_token else None
     
-    # Calculate target expiration as Unix epoch timestamp in seconds
-    expires_at = int(time.time()) + int(expires_in)
+    # Calculate target expiration as an ISO 8601 timestamp in UTC
+    expires_at = (datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))).isoformat()
     
     data = {
         "email": email,

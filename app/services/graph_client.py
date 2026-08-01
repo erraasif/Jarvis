@@ -5,7 +5,7 @@ Handles access token caching, automatic MSAL token refreshing, and HTTP requests
 to Microsoft Graph API for autonomous tools execution.
 """
 
-import time
+from datetime import datetime, timezone, timedelta
 import logging
 import httpx
 import msal
@@ -42,12 +42,23 @@ def get_valid_access_token(user_email: str) -> str:
     # Decrypt stored tokens
     raw_access_token = decrypt_token(user_record.get("access_token"))
     raw_refresh_token = decrypt_token(user_record.get("refresh_token"))
-    expires_at = user_record.get("expires_at", 0)
+    raw_expires_at = user_record.get("expires_at")
 
-    current_timestamp = int(time.time())
+    # Parse ISO 8601 string or fallback if missing
+    if raw_expires_at:
+        if isinstance(raw_expires_at, str):
+            # Handles trailing 'Z' or standard ISO strings
+            expires_at_dt = datetime.fromisoformat(raw_expires_at.replace("Z", "+00:00"))
+        else:
+            expires_at_dt = datetime.fromtimestamp(int(raw_expires_at), tz=timezone.utc)
+    else:
+        expires_at_dt = datetime.now(timezone.utc)
+
+    # Buffer: check if current time + 5 minutes is still before expiration
+    now_utc = datetime.now(timezone.utc)
     
     # 1. Reuse access token if it is still valid for at least 5 minutes (300s buffer)
-    if raw_access_token and expires_at > (current_timestamp + 300):
+    if raw_access_token and (expires_at_dt - now_utc) > timedelta(minutes=5):
         return raw_access_token
 
     # 2. Token is expired or expiring soon -> Refresh via MSAL
@@ -77,13 +88,6 @@ def get_valid_access_token(user_email: str) -> str:
 def graph_request(user_email: str, method: str, endpoint: str, json: dict = None, params: dict = None):
     """
     Executes authenticated requests to Microsoft Graph API.
-    
-    Args:
-        user_email: Target user identifier for token retrieval.
-        method: HTTP Verb ('GET', 'POST', 'PATCH', 'DELETE').
-        endpoint: Graph endpoint relative path (e.g. '/me/events').
-        json: Request body dict.
-        params: URL query parameters dict.
     """
     token = get_valid_access_token(user_email)
     url = f"https://graph.microsoft.com/v1.0{endpoint}"
