@@ -1,5 +1,7 @@
 {
-  "version": 2,
+  "buildCommand": "cd jarvis-frontend && npm run build",
+  "outputDirectory": "jarvis-frontend/dist",
+  "installCommand": "cd jarvis-frontend && npm install",
   "rewrites": [
     {
       "source": "/api/:path*",
