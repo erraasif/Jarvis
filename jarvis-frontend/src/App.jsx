@@ -531,8 +531,7 @@ export default function App() {
                 })}
               </nav>
 
-              {/* Real conversation history — each item is an actual, separate
-                  chat session you can reopen, not a decorative filter. */}
+              {/* Real conversation history */}
               <div className="space-y-1.5">
                 <div className="px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-ink-muted flex items-center gap-1.5">
                   <History size={13} />
@@ -707,6 +706,7 @@ export default function App() {
 
           {activeTab !== "chat" && (
             <div className="flex-1 p-8 md:p-12 overflow-y-auto space-y-8 max-w-5xl mx-auto w-full">
+              {/* Emails Workspace */}
               {activeTab === "emails" && (
                 <DataCard title="Outlook Mailbox" subtitle="Live view of your recent emails and pending drafts." icon={Mail}>
                   {emails.length === 0 ? (
@@ -715,215 +715,290 @@ export default function App() {
                       <p className="text-sm italic">No recent emails found in Outlook.</p>
                     </div>
                   ) : (
-                    emails.map((m, i) => (
-                      <motion.div
-                        key={m.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.04 }}
-                        className="bg-surface-2/60 border border-border/80 p-5 rounded-2xl mb-4 last:mb-0 hover:border-accent/30 transition-colors"
-                      >
-                        <div className="flex justify-between items-center mb-2.5 gap-3">
-                          {editingEmailId === m.id ? (
-                            <input
-                              autoFocus
-                              type="text"
-                              value={editingEmailSubject}
-                              onChange={(e) => setEditingEmailSubject(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") updateEmailDraft(m.id, editingEmailSubject);
-                                if (e.key === "Escape") setEditingEmailId(null);
-                              }}
-                              className="flex-1 bg-surface border border-accent/50 rounded-lg px-3 py-1.5 text-sm text-ink focus:outline-none"
-                            />
-                          ) : (
-                            <strong className="text-ink text-base font-semibold truncate">{m.subject || "(No Subject)"}</strong>
-                          )}
+                    <div className="space-y-3">
+                      {emails.map((m) => (
+                        <motion.div
+                          key={m.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="p-4 rounded-2xl bg-surface-2/40 border border-border/60 hover:border-border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all"
+                        >
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex items-center gap-2">
+                              {m.isDraft && (
+                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                                  Draft
+                                </span>
+                              )}
+                              <h4 className="font-semibold text-sm text-ink truncate">
+                                {m.from?.emailAddress?.name || m.sender || "Unknown Sender"}
+                              </h4>
+                            </div>
 
-                          {m.isDraft ? (
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <span className="text-[11px] px-3 py-1 bg-amber/15 text-amber border border-amber/30 rounded-full font-bold uppercase tracking-wider">Draft</span>
-                              {editingEmailId === m.id ? (
-                                <button onClick={() => updateEmailDraft(m.id, editingEmailSubject)} className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition cursor-pointer">
+                            {editingEmailId === m.id ? (
+                              <div className="flex items-center gap-2 mt-1">
+                                <input
+                                  type="text"
+                                  value={editingEmailSubject}
+                                  onChange={(e) => setEditingEmailSubject(e.target.value)}
+                                  className="flex-1 bg-surface border border-accent/50 rounded-lg px-2.5 py-1 text-xs text-ink focus:outline-none"
+                                />
+                                <button
+                                  onClick={() => updateEmailDraft(m.id, editingEmailSubject)}
+                                  className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition"
+                                >
                                   <Check size={14} />
                                 </button>
-                              ) : (
-                                <button onClick={() => { setEditingEmailId(m.id); setEditingEmailSubject(m.subject || ""); }} className="p-1.5 text-ink-muted hover:text-accent hover:bg-accent/10 rounded-lg transition cursor-pointer">
-                                  <Pencil size={14} />
+                                <button
+                                  onClick={() => setEditingEmailId(null)}
+                                  className="p-1.5 text-ink-muted hover:bg-surface-2 rounded-lg transition"
+                                >
+                                  <X size={14} />
                                 </button>
-                              )}
-                              <button onClick={() => deleteEmailDraft(m.id)} className="p-1.5 text-ink-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition cursor-pointer">
-                                <Trash2 size={14} />
+                              </div>
+                            ) : (
+                              <p className="text-xs text-ink-muted line-clamp-1">{m.subject || "(No Subject)"}</p>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                            {m.isDraft && editingEmailId !== m.id && (
+                              <button
+                                onClick={() => { setEditingEmailId(m.id); setEditingEmailSubject(m.subject || ""); }}
+                                className="p-2 text-ink-muted hover:text-accent hover:bg-accent/10 rounded-xl transition"
+                                title="Edit Draft Subject"
+                              >
+                                <Pencil size={15} />
                               </button>
-                            </div>
-                          ) : (
-                            <span className="shrink-0 text-[11px] px-3 py-1 bg-surface-2 text-ink-muted border border-border rounded-full font-medium truncate max-w-[160px]">
-                              {m.from?.emailAddress?.name || "Received"}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs md:text-sm text-ink-muted leading-relaxed line-clamp-2">{m.bodyPreview || "No preview available."}</p>
-                      </motion.div>
-                    ))
+                            )}
+                            <button
+                              onClick={() => deleteEmailDraft(m.id)}
+                              className="p-2 text-ink-muted hover:text-red-500 hover:bg-red-500/10 rounded-xl transition"
+                              title="Delete Email / Draft"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
                   )}
                 </DataCard>
               )}
 
+              {/* Calendar Workspace */}
               {activeTab === "calendar" && (
                 <DataCard
-                  title="Calendar Agenda"
-                  subtitle="Your upcoming scheduled events."
+                  title="Schedule & Events"
+                  subtitle="Manage upcoming events on your Outlook calendar."
                   icon={Calendar}
                   action={
                     <button
-                      onClick={() => (showEventForm ? closeEventForm() : setShowEventForm(true))}
-                      className="flex items-center gap-1.5 text-xs font-semibold text-accent bg-accent/10 hover:bg-accent/20 border border-accent/30 px-3.5 py-2 rounded-xl transition shrink-0 cursor-pointer"
+                      onClick={() => setShowEventForm((v) => !v)}
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-accent text-accent-ink text-xs font-semibold hover:opacity-90 transition active:scale-95 shadow-md shadow-accent/20 cursor-pointer"
                     >
-                      {showEventForm ? <X size={14} /> : <Plus size={14} />} {showEventForm ? "Cancel" : "Add Event"}
+                      <Plus size={15} /> Add Event
                     </button>
                   }
                 >
                   {showEventForm && (
-                    <form onSubmit={submitEvent} className="bg-surface-2/60 border border-border/80 p-5 rounded-2xl mb-4 space-y-3">
+                    <form onSubmit={submitEvent} className="mb-6 p-4 rounded-2xl bg-surface-2/60 border border-border space-y-3">
+                      <div className="flex justify-between items-center mb-1">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-ink-muted">
+                          {editingEventId ? "Edit Event" : "Create New Event"}
+                        </h4>
+                        <button type="button" onClick={closeEventForm} className="text-ink-muted hover:text-ink">
+                          <X size={14} />
+                        </button>
+                      </div>
                       <input
                         type="text"
-                        placeholder="Event title"
+                        placeholder="Event Title / Subject"
                         value={newEvent.subject}
                         onChange={(e) => setNewEvent({ ...newEvent, subject: e.target.value })}
-                        className="w-full bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-accent"
+                        className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-xs text-ink focus:outline-none focus:border-accent"
                         required
                       />
-                      <div className="flex gap-3">
-                        <input
-                          type="datetime-local"
-                          value={newEvent.start}
-                          onChange={(e) => setNewEvent({ ...newEvent, start: e.target.value })}
-                          className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-accent"
-                          required
-                        />
-                        <input
-                          type="datetime-local"
-                          value={newEvent.end}
-                          onChange={(e) => setNewEvent({ ...newEvent, end: e.target.value })}
-                          className="flex-1 bg-surface border border-border rounded-xl px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-accent"
-                          required
-                        />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] text-ink-muted mb-1 block">Start Time</label>
+                          <input
+                            type="datetime-local"
+                            value={newEvent.start}
+                            onChange={(e) => setNewEvent({ ...newEvent, start: e.target.value })}
+                            className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-xs text-ink focus:outline-none focus:border-accent"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-ink-muted mb-1 block">End Time</label>
+                          <input
+                            type="datetime-local"
+                            value={newEvent.end}
+                            onChange={(e) => setNewEvent({ ...newEvent, end: e.target.value })}
+                            className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-xs text-ink focus:outline-none focus:border-accent"
+                            required
+                          />
+                        </div>
                       </div>
-                      <button type="submit" className="bg-accent text-accent-ink text-sm font-semibold px-5 py-2.5 rounded-xl hover:opacity-90 transition cursor-pointer">
-                        {editingEventId ? "Save Changes" : "Create Event"}
-                      </button>
+                      <div className="flex justify-end gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={closeEventForm}
+                          className="px-3 py-1.5 rounded-lg text-xs font-medium text-ink-muted hover:bg-surface-2"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-4 py-1.5 rounded-lg bg-accent text-accent-ink text-xs font-semibold hover:opacity-90"
+                        >
+                          {editingEventId ? "Save Changes" : "Create Event"}
+                        </button>
+                      </div>
                     </form>
                   )}
+
                   {events.length === 0 ? (
                     <div className="text-center py-14 text-ink-muted">
                       <Calendar size={28} className="mx-auto mb-3 opacity-30" />
-                      <p className="text-sm italic">No events found in calendar.</p>
+                      <p className="text-sm italic">No scheduled events found.</p>
                     </div>
                   ) : (
-                    events.map((e, i) => (
-                      <motion.div
-                        key={e.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.04 }}
-                        className="bg-surface-2/60 border border-border/80 p-5 rounded-2xl mb-3.5 flex justify-between items-center hover:border-accent/30 transition-colors"
-                      >
-                        <div>
-                          <strong className="text-ink text-base font-semibold block">{e.subject}</strong>
-                          <p className="text-xs text-ink-muted mt-1 font-mono">
-                            {new Date(e.start?.dateTime).toLocaleString()} — {new Date(e.end?.dateTime).toLocaleString()}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button onClick={() => openEditEvent(e)} className="p-2 text-ink-muted hover:text-accent hover:bg-accent/10 rounded-lg transition cursor-pointer">
-                            <Pencil size={15} />
-                          </button>
-                          <button onClick={() => deleteEvent(e.id)} className="p-2 text-ink-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition cursor-pointer">
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </motion.div>
-                    ))
+                    <div className="space-y-3">
+                      {events.map((evt) => (
+                        <motion.div
+                          key={evt.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="p-4 rounded-2xl bg-surface-2/40 border border-border/60 hover:border-border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all"
+                        >
+                          <div className="space-y-1">
+                            <h4 className="font-semibold text-sm text-ink">{evt.subject}</h4>
+                            <p className="text-xs text-ink-muted">
+                              {evt.start?.dateTime ? new Date(evt.start.dateTime).toLocaleString() : "TBD"} -{" "}
+                              {evt.end?.dateTime ? new Date(evt.end.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "TBD"}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              onClick={() => openEditEvent(evt)}
+                              className="p-2 text-ink-muted hover:text-accent hover:bg-accent/10 rounded-xl transition"
+                              title="Edit Event"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                            <button
+                              onClick={() => deleteEvent(evt.id)}
+                              className="p-2 text-ink-muted hover:text-red-500 hover:bg-red-500/10 rounded-xl transition"
+                              title="Delete Event"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
                   )}
                 </DataCard>
               )}
 
+              {/* To-Dos Workspace */}
               {activeTab === "todos" && (
-                <DataCard title="Microsoft To-Do Tasks" subtitle="Active task list from Microsoft To-Do." icon={CheckSquare}>
-                  <form onSubmit={createTodo} className="flex gap-3 mb-5">
+                <DataCard title="Task Manager" subtitle="Sync tasks seamlessly with Microsoft To-Do." icon={CheckSquare}>
+                  <form onSubmit={createTodo} className="flex gap-2 mb-6">
                     <input
                       type="text"
                       placeholder="Add a new task..."
                       value={newTodoTitle}
                       onChange={(e) => setNewTodoTitle(e.target.value)}
-                      className="flex-1 bg-surface-2/60 border border-border/80 rounded-xl px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-accent"
+                      className="flex-1 bg-surface-2/60 border border-border rounded-xl px-4 py-2.5 text-xs text-ink focus:outline-none focus:border-accent"
                     />
-                    <button type="submit" className="flex items-center gap-1.5 bg-accent text-accent-ink text-sm font-semibold px-4 py-2.5 rounded-xl hover:opacity-90 transition shrink-0 cursor-pointer">
-                      <Plus size={16} /> Add
+                    <button
+                      type="submit"
+                      disabled={!newTodoTitle.trim()}
+                      className="px-4 py-2.5 rounded-xl bg-accent text-accent-ink text-xs font-semibold hover:opacity-90 disabled:opacity-40 transition active:scale-95 cursor-pointer"
+                    >
+                      Add Task
                     </button>
                   </form>
+
                   {todos.length === 0 ? (
                     <div className="text-center py-14 text-ink-muted">
                       <CheckSquare size={28} className="mx-auto mb-3 opacity-30" />
-                      <p className="text-sm italic">To-Do list is currently empty.</p>
+                      <p className="text-sm italic">No tasks found in your list.</p>
                     </div>
                   ) : (
-                    todos.map((t, i) => (
-                      <motion.div
-                        key={t.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.04 }}
-                        className="bg-surface-2/60 border border-border/80 p-4 rounded-2xl mb-3 flex items-center justify-between gap-3.5 hover:border-accent/30 transition-colors"
-                      >
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <button
-                            onClick={() => toggleTodo(t)}
-                            className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors cursor-pointer ${
-                              t.status === "completed" ? "bg-accent border-accent text-accent-ink" : "border-border hover:border-accent"
-                            }`}
+                    <div className="space-y-2">
+                      {todos.map((task) => {
+                        const isDone = task.status === "completed";
+                        return (
+                          <motion.div
+                            key={task.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="p-3.5 rounded-2xl bg-surface-2/40 border border-border/60 hover:border-border flex items-center justify-between gap-3 transition-all"
                           >
-                            {t.status === "completed" && <Check size={12} strokeWidth={3} />}
-                          </button>
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <button
+                                onClick={() => toggleTodo(task)}
+                                className={`w-5 h-5 rounded-lg border flex items-center justify-center transition cursor-pointer shrink-0 ${
+                                  isDone
+                                    ? "bg-emerald-500 border-emerald-500 text-white"
+                                    : "border-border hover:border-accent"
+                                }`}
+                              >
+                                {isDone && <Check size={12} />}
+                              </button>
 
-                          {editingTodoId === t.id ? (
-                            <input
-                              type="text"
-                              value={editingTodoText}
-                              onChange={(e) => setEditingTodoText(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") updateTodoTitle(t.id, editingTodoText);
-                                if (e.key === "Escape") setEditingTodoId(null);
-                              }}
-                              className="flex-1 bg-surface border border-border rounded-lg px-2.5 py-1 text-sm text-ink focus:outline-none focus:border-accent"
-                              autoFocus
-                            />
-                          ) : (
-                            <span className={`text-sm ${t.status === "completed" ? "line-through text-ink-muted" : "text-ink font-medium"}`}>
-                              {t.title}
-                            </span>
-                          )}
-                        </div>
+                              {editingTodoId === task.id ? (
+                                <div className="flex items-center gap-2 flex-1">
+                                  <input
+                                    type="text"
+                                    value={editingTodoText}
+                                    onChange={(e) => setEditingTodoText(e.target.value)}
+                                    className="flex-1 bg-surface border border-accent/50 rounded-lg px-2.5 py-1 text-xs text-ink focus:outline-none"
+                                  />
+                                  <button
+                                    onClick={() => updateTodoTitle(task.id, editingTodoText)}
+                                    className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition"
+                                  >
+                                    <Check size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingTodoId(null)}
+                                    className="p-1.5 text-ink-muted hover:bg-surface-2 rounded-lg transition"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className={`text-xs font-medium truncate ${isDone ? "line-through text-ink-muted" : "text-ink"}`}>
+                                  {task.title}
+                                </span>
+                              )}
+                            </div>
 
-                        <div className="flex items-center gap-1 shrink-0">
-                          {editingTodoId === t.id ? (
-                            <button onClick={() => updateTodoTitle(t.id, editingTodoText)} className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition cursor-pointer">
-                              <Check size={16} />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => { setEditingTodoId(t.id); setEditingTodoText(t.title); }}
-                              className="p-1.5 text-ink-muted hover:text-accent hover:bg-accent/10 rounded-lg transition cursor-pointer"
-                            >
-                              <Pencil size={14} />
-                            </button>
-                          )}
-                          <button onClick={() => deleteTodo(t.id)} className="p-1.5 text-ink-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition cursor-pointer">
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </motion.div>
-                    ))
+                            {editingTodoId !== task.id && (
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  onClick={() => { setEditingTodoId(task.id); setEditingTodoText(task.title); }}
+                                  className="p-1.5 text-ink-muted hover:text-accent hover:bg-accent/10 rounded-lg transition"
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                                <button
+                                  onClick={() => deleteTodo(task.id)}
+                                  className="p-1.5 text-ink-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            )}
+                          </motion.div>
+                        );
+                      })}
+                    </div>
                   )}
                 </DataCard>
               )}
