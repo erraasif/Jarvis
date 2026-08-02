@@ -492,160 +492,165 @@ export default function App() {
   return (
     <div className="min-h-screen bg-bg text-ink font-body selection:bg-accent/30 transition-colors duration-300">
       <div className="flex h-screen overflow-hidden">
-        {/* Sleek Collapsible Modern Sidebar */}
-        <aside
-          className={`${
-            sidebarOpen ? "w-64 md:w-72" : "w-16"
-          } bg-surface/80 backdrop-blur-2xl border-r border-border/70 p-3.5 flex flex-col justify-between relative z-20 shrink-0 transition-all duration-300 ease-in-out`}
+       {/* Sleek Collapsible Modern Sidebar */}
+<aside
+  className={`${
+    sidebarOpen ? "w-64 md:w-72" : "w-16"
+  } bg-surface/80 backdrop-blur-2xl border-r border-border/70 p-3.5 flex flex-col justify-between relative z-20 shrink-0 transition-all duration-300 ease-in-out`}
+>
+  <div className="flex flex-col h-full overflow-hidden">
+    {/* Top Bar with Sidebar Toggle */}
+    <div className="flex items-center justify-between mb-4 pb-3 border-b border-border/60 shrink-0">
+      {sidebarOpen ? (
+        <div className="flex items-center gap-2.5 px-1">
+          <Logo size={30} />
+          <span className="font-display font-bold text-lg tracking-tight text-ink">Jarvis</span>
+        </div>
+      ) : (
+        <button 
+          onClick={() => setSidebarOpen(true)}
+          className="mx-auto p-1.5 rounded-xl hover:bg-surface-2 transition cursor-pointer"
+          title="Expand sidebar"
         >
-          <div className="flex flex-col h-full overflow-hidden">
-            {/* Top Bar with Sidebar Drawer Toggle */}
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-border/60 shrink-0">
-              {sidebarOpen ? (
-                <div className="flex items-center gap-2.5 px-1">
-                  <Logo size={30} />
-                  <span className="font-display font-bold text-lg tracking-tight text-ink">Jarvis</span>
-                </div>
-              ) : (
-                <div className="mx-auto">
-                  <Logo size={26} />
-                </div>
-              )}
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="p-2 rounded-xl text-ink-muted hover:text-ink hover:bg-surface-2 transition cursor-pointer"
-                title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-              >
-                {sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeft size={18} />}
-              </button>
-            </div>
+          <Logo size={24} />
+        </button>
+      )}
+      
+      <button
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        className={`p-2 rounded-xl text-ink-muted hover:text-ink hover:bg-surface-2 transition cursor-pointer ${!sidebarOpen ? "hidden" : ""}`}
+        title="Collapse sidebar"
+      >
+        <PanelLeftClose size={18} />
+      </button>
+    </div>
 
-            {/* New Chat Button */}
+    {/* New Chat Button */}
+    <button
+      onClick={handleNewChat}
+      className={`w-full mb-4 flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-accent text-accent-ink font-semibold hover:opacity-90 transition-all shadow-md shadow-accent/15 cursor-pointer active:scale-[0.98] shrink-0 ${
+        !sidebarOpen ? "px-0" : ""
+      }`}
+      title="New Chat"
+    >
+      <Plus size={18} />
+      {sidebarOpen && <span className="text-sm">New Chat</span>}
+    </button>
+
+    <div className="flex-1 overflow-y-auto space-y-5 pr-0.5 min-h-0 custom-scrollbar">
+      {/* Workspace Apps */}
+      <nav className="space-y-1">
+        {sidebarOpen && (
+          <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted">
+            Workspace
+          </div>
+        )}
+        {TABS.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
             <button
-              onClick={handleNewChat}
-              className={`w-full mb-4 flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-accent text-accent-ink font-semibold hover:opacity-90 transition-all shadow-md shadow-accent/15 cursor-pointer active:scale-[0.98] shrink-0 ${
-                !sidebarOpen && "px-0"
-              }`}
-              title="New Chat"
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              title={!sidebarOpen ? tab.label : undefined}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-[0.98] cursor-pointer ${
+                isActive
+                  ? "bg-surface-2 text-ink shadow-sm border border-border/80"
+                  : "text-ink-muted hover:bg-surface-2/60 hover:text-ink"
+              } ${!sidebarOpen ? "justify-center px-0" : ""}`}
             >
-              <Plus size={18} />
-              {sidebarOpen && <span className="text-sm">New Chat</span>}
+              <Icon size={18} className={isActive ? "text-accent" : "opacity-75"} />
+              {sidebarOpen && <span className="truncate">{tab.label}</span>}
             </button>
+          );
+        })}
+      </nav>
 
-            <div className="flex-1 overflow-y-auto space-y-5 pr-0.5 min-h-0 custom-scrollbar">
-              {/* Workspace Apps */}
-              <nav className="space-y-1">
-                {sidebarOpen && (
-                  <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted">
-                    Workspace
-                  </div>
+      {/* Chat History List with Context Dropdown Menu */}
+      {sidebarOpen && (
+        <div className="space-y-4">
+          {/* Pinned Section */}
+          {pinnedSessions.length > 0 && (
+            <div className="space-y-1">
+              <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted flex items-center gap-1.5">
+                <Pin size={11} className="text-accent" />
+                <span>Pinned</span>
+              </div>
+              <div className="space-y-0.5">
+                {pinnedSessions.map((s) =>
+                  renderSessionRow(s, currentSessionId, editingSessionId, editingSessionText, activeMenuSessionId, {
+                    loadSession, setEditingSessionId, setEditingSessionText, renameSessionOptimistic, togglePinOptimistic, deleteSessionOptimistic, setActiveMenuSessionId
+                  })
                 )}
-                {TABS.map((tab) => {
-                  const Icon = tab.icon;
-                  const isActive = activeTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      title={!sidebarOpen ? tab.label : undefined}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-[0.98] cursor-pointer ${
-                        isActive
-                          ? "bg-surface-2 text-ink shadow-sm border border-border/80"
-                          : "text-ink-muted hover:bg-surface-2/60 hover:text-ink"
-                      } ${!sidebarOpen ? "justify-center px-0" : ""}`}
-                    >
-                      <Icon size={18} className={isActive ? "text-accent" : "opacity-75"} />
-                      {sidebarOpen && <span className="truncate">{tab.label}</span>}
-                    </button>
-                  );
-                })}
-              </nav>
-
-              {/* Chat History List with Context Dropdown Menu */}
-              {sidebarOpen && (
-                <div className="space-y-4">
-                  {/* Pinned Section */}
-                  {pinnedSessions.length > 0 && (
-                    <div className="space-y-1">
-                      <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted flex items-center gap-1.5">
-                        <Pin size={11} className="text-accent" />
-                        <span>Pinned</span>
-                      </div>
-                      <div className="space-y-0.5">
-                        {pinnedSessions.map((s) =>
-                          renderSessionRow(s, currentSessionId, editingSessionId, editingSessionText, activeMenuSessionId, {
-                            loadSession, setEditingSessionId, setEditingSessionText, renameSessionOptimistic, togglePinOptimistic, deleteSessionOptimistic, setActiveMenuSessionId
-                          })
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Recents Section */}
-                  <div className="space-y-1">
-                    <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted flex items-center gap-1.5">
-                      <History size={11} />
-                      <span>Recent</span>
-                    </div>
-                    {unpinnedSessions.length === 0 && pinnedSessions.length === 0 ? (
-                      <p className="px-2.5 text-xs text-ink-muted italic">No past chats.</p>
-                    ) : (
-                      <div className="space-y-0.5">
-                        {unpinnedSessions.map((s) =>
-                          renderSessionRow(s, currentSessionId, editingSessionId, editingSessionText, activeMenuSessionId, {
-                            loadSession, setEditingSessionId, setEditingSessionText, renameSessionOptimistic, togglePinOptimistic, deleteSessionOptimistic, setActiveMenuSessionId
-                          })
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Bottom Profile Section */}
-          <div className="pt-3 border-t border-border/60 space-y-2 relative shrink-0">
-            {showProfile && (
-              <ProfilePanel
-                email={currentUserEmail}
-                isDark={isDark}
-                setIsDark={setIsDark}
-                onLogout={handleLogout}
-                onClose={() => setShowProfile(false)}
-              />
+          {/* Recents Section */}
+          <div className="space-y-1">
+            <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted flex items-center gap-1.5">
+              <History size={11} />
+              <span>Recent</span>
+            </div>
+            {unpinnedSessions.length === 0 && pinnedSessions.length === 0 ? (
+              <p className="px-2.5 text-xs text-ink-muted italic">No past chats.</p>
+            ) : (
+              <div className="space-y-0.5">
+                {unpinnedSessions.map((s) =>
+                  renderSessionRow(s, currentSessionId, editingSessionId, editingSessionText, activeMenuSessionId, {
+                    loadSession, setEditingSessionId, setEditingSessionText, renameSessionOptimistic, togglePinOptimistic, deleteSessionOptimistic, setActiveMenuSessionId
+                  })
+                )}
+              </div>
             )}
-            
-            <div className="flex items-center justify-between">
-              <button
-                onClick={() => setShowProfile((v) => !v)}
-                className={`flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-surface-2/60 transition text-left cursor-pointer ${
-                  !sidebarOpen ? "justify-center w-full" : "flex-1 min-w-0"
-                }`}
-              >
-                <div className="w-8 h-8 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center text-accent font-bold text-xs shrink-0">
-                  {currentUserEmail ? currentUserEmail[0].toUpperCase() : "U"}
-                </div>
-                {sidebarOpen && (
-                  <div className="flex flex-col min-w-0 flex-1">
-                    <span className="text-xs font-semibold text-ink truncate">{currentUserEmail}</span>
-                    <span className="text-[10px] text-ink-muted">Connected Account</span>
-                  </div>
-                )}
-              </button>
-
-              {sidebarOpen && (
-                <button
-                  onClick={() => setIsDark(!isDark)}
-                  className="p-2 rounded-xl text-ink-muted hover:text-ink hover:bg-surface-2 transition cursor-pointer"
-                  title="Toggle Theme"
-                >
-                  {isDark ? <Sun size={16} /> : <Moon size={16} />}
-                </button>
-              )}
-            </div>
           </div>
-        </aside>
+        </div>
+      )}
+    </div>
+  </div>
+
+  {/* Bottom Profile Section */}
+  <div className="pt-3 border-t border-border/60 space-y-2 relative shrink-0">
+    {showProfile && (
+      <ProfilePanel
+        email={currentUserEmail}
+        isDark={isDark}
+        setIsDark={setIsDark}
+        onLogout={handleLogout}
+        onClose={() => setShowProfile(false)}
+      />
+    )}
+    
+    <div className="flex items-center justify-between">
+      <button
+        onClick={() => setShowProfile((v) => !v)}
+        className={`flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-surface-2/60 transition text-left cursor-pointer ${
+          !sidebarOpen ? "justify-center w-full" : "flex-1 min-w-0"
+        }`}
+      >
+        <div className="w-8 h-8 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center text-accent font-bold text-xs shrink-0">
+          {currentUserEmail ? currentUserEmail[0].toUpperCase() : "U"}
+        </div>
+        {sidebarOpen && (
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="text-xs font-semibold text-ink truncate">{currentUserEmail}</span>
+            <span className="text-[10px] text-ink-muted">Connected Account</span>
+          </div>
+        )}
+      </button>
+
+      {sidebarOpen && (
+        <button
+          onClick={() => setIsDark(!isDark)}
+          className="p-2 rounded-xl text-ink-muted hover:text-ink hover:bg-surface-2 transition cursor-pointer"
+          title="Toggle Theme"
+        >
+          {isDark ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
+      )}
+    </div>
+  </div>
+</aside>
 
         {/* Workspace View Area */}
         <main className="flex-1 flex flex-col h-full bg-bg relative overflow-hidden">
