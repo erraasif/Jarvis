@@ -47,7 +47,6 @@ def get_valid_access_token(user_email: str) -> str:
     # Parse ISO 8601 string or fallback if missing
     if raw_expires_at:
         if isinstance(raw_expires_at, str):
-            # Handles trailing 'Z' or standard ISO strings
             expires_at_dt = datetime.fromisoformat(raw_expires_at.replace("Z", "+00:00"))
         else:
             expires_at_dt = datetime.fromtimestamp(int(raw_expires_at), tz=timezone.utc)
@@ -115,3 +114,44 @@ def graph_request(user_email: str, method: str, endpoint: str, json: dict = None
             raise Exception(f"Microsoft Graph API error ({response.status_code}): {error_msg}")
             
         return response.json()
+
+
+def create_email_draft(user_email: str, body: str, recipient: str = None, subject: str = None, message_id: str = None):
+    """
+    Creates a draft email in Outlook Drafts folder safely.
+    Auto-fetches the latest email if creating a reply without explicit target details.
+    """
+    # If drafting a reply to the "latest email" and details are missing:
+    if not recipient or not subject:
+        latest_msgs = graph_request(user_email, "GET", "/me/messages?$top=1&$select=id,subject,sender")
+        if latest_msgs.get("value"):
+            latest = latest_msgs["value"][0]
+            message_id = message_id or latest.get("id")
+            subject = subject or f"Re: {latest.get('subject', '')}"
+            sender_info = latest.get("sender", {}).get("emailAddress", {})
+            recipient = recipient or sender_info.get("address")
+
+    if message_id:
+        # Use native Microsoft Graph createReplyDraft endpoint
+        endpoint = f"/me/messages/{message_id}/createReply"
+        reply_payload = {
+            "comment": body
+        }
+        return graph_request(user_email, "POST", endpoint, json=reply_payload)
+
+    # Standard draft creation fallback
+    payload = {
+        "subject": subject or "No Subject",
+        "body": {
+            "contentType": "HTML",
+            "content": body
+        },
+        "toRecipients": [
+            {
+                "emailAddress": {
+                    "address": recipient
+                }
+            }
+        ] if recipient else []
+    }
+    return graph_request(user_email, "POST", "/me/messages", json=payload)
