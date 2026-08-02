@@ -1,19 +1,15 @@
 /**
- * Main Application Dashboard Component
- * ====================================
- * Serves as the central React interface for the JARVIS AI Assistant.
- * Handles authentication state, active workspace tabs, real chat
- * sessions/history, and Microsoft 365 services (Mail, Calendar, To-Do)
- * data synchronization.
+ * Jarvis Dashboard - Enterprise Modern UI
+ * Features: Optimistic session state, 3-dot dropdown popover, Pinned chats, Collapsible Drawer
  */
 
 import React, { useState, useEffect, useRef } from "react";
 import {
-  MessageSquare, Mail, Calendar, CheckSquare, LogOut,
+  MessageSquare, Mail, Calendar, CheckSquare,
   Send, Bot, RefreshCcw, Sparkles, ShieldCheck, Sun, Moon,
-  Plus, Trash2, X, AlertCircle, Pencil, Check, History
+  Plus, Trash2, X, AlertCircle, Pencil, Check, History,
+  PanelLeftClose, PanelLeft, MoreVertical, Pin, PinOff
 } from "lucide-react";
-import { motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -22,10 +18,6 @@ import Logo from "./Logo.jsx";
 import ProfilePanel, { applyStoredAccent } from "./ProfilePanel.jsx";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "https://jarvis-backend-h38f.onrender.com";
-
-// The browser's IANA timezone — sent with every chat message so "tomorrow
-// at 3pm" resolves against the user's real local time, and used for
-// manually-created events instead of a hardcoded UTC.
 const USER_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
 const TABS = [
@@ -35,20 +27,7 @@ const TABS = [
   { id: "todos", label: "To-Do List", icon: CheckSquare },
 ];
 
-const INITIAL_MESSAGE = { sender: "jarvis", text: "Hello! I am Jarvis. Tell me what you'd like to manage across your Outlook Mail, Calendar, or To-Dos." };
-
-function relativeTime(iso) {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days === 1) return "Yesterday";
-  if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
-}
+const INITIAL_MESSAGE = { sender: "jarvis", text: "Hello! I am Jarvis. How can I assist you with your Outlook Mail, Calendar, or Tasks today?" };
 
 function MarkdownMessage({ text }) {
   return (
@@ -89,6 +68,10 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // Active floating dropdown menu ID
+  const [activeMenuSessionId, setActiveMenuSessionId] = useState(null);
 
   const chatEndRef = useRef(null);
 
@@ -118,12 +101,12 @@ export default function App() {
   const [events, setEvents] = useState([]);
   const [todos, setTodos] = useState([]);
 
-  // Real conversation sessions (not a decorative filter of in-memory
-  // messages) — each has its own id and its own row of messages in Supabase.
   const [sessions, setSessions] = useState([]);
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [editingSessionText, setEditingSessionText] = useState("");
+
+  const currentUserEmailFor = () => localStorage.getItem("jarvis_user_email") || "";
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -139,10 +122,16 @@ export default function App() {
     }
   }, []);
 
-  const currentUserEmailFor = () => localStorage.getItem("jarvis_user_email");
+  // Close context menu on outside click
+  useEffect(() => {
+    const handleClickOutside = () => setActiveMenuSessionId(null);
+    window.addEventListener("click", handleClickOutside);
+    return () => window.removeEventListener("click", handleClickOutside);
+  }, []);
 
   const refreshSessions = () => {
     const userEmail = currentUserEmailFor();
+    if (!userEmail) return Promise.resolve([]);
     return fetch(`${API_BASE_URL}/chat/sessions?user_email=${encodeURIComponent(userEmail)}`)
       .then((res) => res.json())
       .then((data) => {
@@ -154,6 +143,7 @@ export default function App() {
 
   const loadSession = async (sessionId) => {
     const userEmail = currentUserEmailFor();
+    if (!userEmail) return;
     setCurrentSessionId(sessionId);
     setActiveTab("chat");
     try {
@@ -169,8 +159,6 @@ export default function App() {
     }
   };
 
-  // On login: load past sessions, and open the most recent one if any
-  // exist — otherwise start a fresh conversation.
   useEffect(() => {
     if (!isAuthenticated) return;
     refreshSessions().then((list) => {
@@ -196,14 +184,8 @@ export default function App() {
     }
   }, [messages, activeTab]);
 
-  const handleLogin = () => {
-    window.location.href = `${API_BASE_URL}/api/auth/login`;
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("jarvis_user_email");
-    setIsAuthenticated(false);
-  };
+  const handleLogin = () => { window.location.href = `${API_BASE_URL}/api/auth/login`; };
+  const handleLogout = () => { localStorage.removeItem("jarvis_user_email"); setIsAuthenticated(false); };
 
   const handleNewChat = () => {
     setCurrentSessionId(crypto.randomUUID());
@@ -211,39 +193,73 @@ export default function App() {
     setActiveTab("chat");
   };
 
-  const deleteSession = async (e, sessionId) => {
-    e.stopPropagation();
+  // Instant / Optimistic Delete Session
+  const deleteSessionOptimistic = async (sessionId) => {
+    setActiveMenuSessionId(null);
     const userEmail = currentUserEmailFor();
-    await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}?user_email=${encodeURIComponent(userEmail)}`, { method: "DELETE" });
-    const list = await refreshSessions();
+    const originalSessions = [...sessions];
+
+    // 1. Immediately update UI
+    const updated = sessions.filter((s) => s.session_id !== sessionId);
+    setSessions(updated);
+
     if (sessionId === currentSessionId) {
-      if (list.length > 0) loadSession(list[0].session_id);
+      if (updated.length > 0) loadSession(updated[0].session_id);
       else handleNewChat();
+    }
+
+    // 2. Perform DB delete call in background
+    try {
+      await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}?user_email=${encodeURIComponent(userEmail)}`, { method: "DELETE" });
+    } catch {
+      // Rollback on failure
+      setSessions(originalSessions);
     }
   };
 
-  const renameSession = async (sessionId, newTitle) => {
+  // Instant / Optimistic Rename Session
+  const renameSessionOptimistic = async (sessionId, newTitle) => {
     if (!newTitle.trim()) return;
-    const userEmail = currentUserEmailFor();
-    await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_email: userEmail, title: newTitle }),
-    });
+    setActiveMenuSessionId(null);
     setEditingSessionId(null);
-    refreshSessions();
+    const userEmail = currentUserEmailFor();
+    const originalSessions = [...sessions];
+
+    // 1. Immediately update UI
+    setSessions((prev) =>
+      prev.map((s) => (s.session_id === sessionId ? { ...s, title: newTitle } : s))
+    );
+
+    // 2. Perform DB update in background
+    try {
+      await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_email: userEmail, title: newTitle }),
+      });
+    } catch {
+      // Rollback on failure
+      setSessions(originalSessions);
+    }
+  };
+
+  // Instant Pin Toggle
+  const togglePinOptimistic = (sessionId) => {
+    setActiveMenuSessionId(null);
+    setSessions((prev) =>
+      prev.map((s) => (s.session_id === sessionId ? { ...s, isPinned: !s.isPinned } : s))
+    );
   };
 
   const handleSendMessage = async (e) => {
     if (e) e.preventDefault();
-    if (!inputMessage.trim() || !isAuthenticated || loading) return;
+    const userEmail = currentUserEmailFor();
+    if (!inputMessage.trim() || !userEmail || loading) return;
 
     const userMsg = inputMessage;
     setInputMessage("");
     setLoading(true);
 
-    // Add the user's message, plus an empty placeholder for Jarvis's reply
-    // that we'll fill in as chunks arrive.
     setMessages((prev) => [...prev, { sender: "user", text: userMsg }, { sender: "jarvis", text: "" }]);
 
     const appendToReply = (chunk) => {
@@ -255,7 +271,6 @@ export default function App() {
     };
 
     try {
-      const userEmail = currentUserEmailFor();
       const res = await fetch(`${API_BASE_URL}/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -280,7 +295,7 @@ export default function App() {
         buffer += decoder.decode(value, { stream: true });
 
         const parts = buffer.split("\n\n");
-        buffer = parts.pop(); // last part may be incomplete — keep for next read
+        buffer = parts.pop();
 
         for (const part of parts) {
           if (!part.startsWith("data: ")) continue;
@@ -291,10 +306,8 @@ export default function App() {
         }
       }
 
-      if (!gotAnyChunk) {
-        appendToReply("Request processed successfully.");
-      }
-      refreshSessions(); // pick up the new/updated session title + ordering
+      if (!gotAnyChunk) appendToReply("Request processed successfully.");
+      refreshSessions();
     } catch (err) {
       appendToReply("Error: Unable to reach JARVIS backend service.");
     } finally {
@@ -305,19 +318,38 @@ export default function App() {
   const fetchData = async (endpoint, setter) => {
     try {
       const userEmail = currentUserEmailFor();
+      if (!userEmail) return;
       const res = await fetch(`${API_BASE_URL}${endpoint}?user_email=${encodeURIComponent(userEmail)}`);
       const data = await res.json();
       const list = Array.isArray(data) ? data : Array.isArray(data.value) ? data.value : [];
       setter(list);
-    } catch (err) {
+    } catch {
       setter([]);
     }
   };
 
   const fetchEmails = () => fetchData("/emails", setEmails);
+  const fetchEvents = () => fetchData("/events", setEvents);
+  const fetchTodos = () => fetchData("/todos", setTodos);
 
   const [editingEmailId, setEditingEmailId] = useState(null);
   const [editingEmailSubject, setEditingEmailSubject] = useState("");
+  const [newTodoTitle, setNewTodoTitle] = useState("");
+  const [editingTodoId, setEditingTodoId] = useState(null);
+  const [editingTodoText, setEditingTodoText] = useState("");
+  const [showEventForm, setShowEventForm] = useState(false);
+  const [editingEventId, setEditingEventId] = useState(null);
+  const [newEvent, setNewEvent] = useState({ subject: "", start: "", end: "" });
+
+  const handleApiResult = async (res, onSuccess) => {
+    if (res.ok) {
+      setActionError("");
+      onSuccess();
+    } else {
+      const body = await res.json().catch(() => ({}));
+      setActionError(body.detail || `Request failed (${res.status})`);
+    }
+  };
 
   const updateEmailDraft = async (emailId, newSubject) => {
     if (!newSubject.trim()) return;
@@ -334,25 +366,6 @@ export default function App() {
     const userEmail = currentUserEmailFor();
     const res = await fetch(`${API_BASE_URL}/emails/${emailId}?user_email=${encodeURIComponent(userEmail)}`, { method: "DELETE" });
     await handleApiResult(res, fetchEmails);
-  };
-  const fetchEvents = () => fetchData("/events", setEvents);
-  const fetchTodos = () => fetchData("/todos", setTodos);
-
-  const [newTodoTitle, setNewTodoTitle] = useState("");
-  const [editingTodoId, setEditingTodoId] = useState(null);
-  const [editingTodoText, setEditingTodoText] = useState("");
-  const [showEventForm, setShowEventForm] = useState(false);
-  const [editingEventId, setEditingEventId] = useState(null);
-  const [newEvent, setNewEvent] = useState({ subject: "", start: "", end: "" });
-
-  const handleApiResult = async (res, onSuccess) => {
-    if (res.ok) {
-      setActionError("");
-      onSuccess();
-    } else {
-      const body = await res.json().catch(() => ({}));
-      setActionError(body.detail || `Request failed (${res.status})`);
-    }
   };
 
   const createTodo = async (e) => {
@@ -421,7 +434,6 @@ export default function App() {
   };
 
   const toLocalInputValue = (iso) => (iso ? iso.slice(0, 16) : "");
-
   const openEditEvent = (evt) => {
     setNewEvent({
       subject: evt.subject || "",
@@ -444,17 +456,10 @@ export default function App() {
     await handleApiResult(res, fetchEvents);
   };
 
-  const currentUserEmail = localStorage.getItem("jarvis_user_email") || "User";
+  const currentUserEmail = currentUserEmailFor() || "Connected Account";
 
-  const ThemeToggleBtn = () => (
-    <button
-      onClick={() => setIsDark(!isDark)}
-      className="p-2.5 rounded-2xl bg-surface-2 border border-border text-ink hover:text-accent transition-all active:scale-95 cursor-pointer"
-      title="Toggle Light/Dark Theme"
-    >
-      {isDark ? <Sun size={18} /> : <Moon size={18} />}
-    </button>
-  );
+  const pinnedSessions = sessions.filter((s) => s.isPinned);
+  const unpinnedSessions = sessions.filter((s) => !s.isPinned);
 
   const DataCard = ({ title, subtitle, children, icon: Icon, action }) => (
     <div className="bg-surface/80 backdrop-blur-xl border border-border rounded-3xl p-6 md:p-8 shadow-xl transition-all duration-300">
@@ -487,114 +492,120 @@ export default function App() {
   return (
     <div className="min-h-screen bg-bg text-ink font-body selection:bg-accent/30 transition-colors duration-300">
       <div className="flex h-screen overflow-hidden">
-        {/* Sidebar */}
-        <aside className="w-80 bg-surface/70 backdrop-blur-2xl border-r border-border/80 p-6 flex flex-col justify-between relative z-20 shrink-0">
+        {/* Sleek Collapsible Modern Sidebar */}
+        <aside
+          className={`${
+            sidebarOpen ? "w-64 md:w-72" : "w-16"
+          } bg-surface/80 backdrop-blur-2xl border-r border-border/70 p-3.5 flex flex-col justify-between relative z-20 shrink-0 transition-all duration-300 ease-in-out`}
+        >
           <div className="flex flex-col h-full overflow-hidden">
-            <div className="flex items-center justify-between mb-6 pb-4 border-b border-border/80 shrink-0">
-              <div className="flex items-center gap-3">
-                <Logo size={38} />
-                <h2 className="font-display font-bold text-xl tracking-tight text-ink text-glow">Jarvis</h2>
-              </div>
-              <ThemeToggleBtn />
+            {/* Top Bar with Sidebar Drawer Toggle */}
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-border/60 shrink-0">
+              {sidebarOpen ? (
+                <div className="flex items-center gap-2.5 px-1">
+                  <Logo size={30} />
+                  <span className="font-display font-bold text-lg tracking-tight text-ink">Jarvis</span>
+                </div>
+              ) : (
+                <div className="mx-auto">
+                  <Logo size={26} />
+                </div>
+              )}
+              <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="p-2 rounded-xl text-ink-muted hover:text-ink hover:bg-surface-2 transition cursor-pointer"
+                title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+              >
+                {sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeft size={18} />}
+              </button>
             </div>
 
+            {/* New Chat Button */}
             <button
               onClick={handleNewChat}
-              className="w-full mb-6 flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-accent text-accent-ink font-semibold hover:opacity-90 transition-all shadow-lg shadow-accent/20 cursor-pointer active:scale-[0.98] shrink-0"
+              className={`w-full mb-4 flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-accent text-accent-ink font-semibold hover:opacity-90 transition-all shadow-md shadow-accent/15 cursor-pointer active:scale-[0.98] shrink-0 ${
+                !sidebarOpen && "px-0"
+              }`}
+              title="New Chat"
             >
               <Plus size={18} />
-              <span>New Chat</span>
+              {sidebarOpen && <span className="text-sm">New Chat</span>}
             </button>
 
-            <div className="flex-1 overflow-y-auto space-y-6 pr-1 min-h-0">
-              <nav className="space-y-1.5">
-                <div className="px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-ink-muted">
-                  Workspace
-                </div>
-                {TABS.map(tab => {
+            <div className="flex-1 overflow-y-auto space-y-5 pr-0.5 min-h-0 custom-scrollbar">
+              {/* Workspace Apps */}
+              <nav className="space-y-1">
+                {sidebarOpen && (
+                  <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted">
+                    Workspace
+                  </div>
+                )}
+                {TABS.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
                   return (
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 active:scale-[0.98] cursor-pointer ${
+                      title={!sidebarOpen ? tab.label : undefined}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-[0.98] cursor-pointer ${
                         isActive
-                          ? "bg-surface-2 text-ink shadow-md border border-border/90"
+                          ? "bg-surface-2 text-ink shadow-sm border border-border/80"
                           : "text-ink-muted hover:bg-surface-2/60 hover:text-ink"
-                      }`}
+                      } ${!sidebarOpen ? "justify-center px-0" : ""}`}
                     >
-                      <Icon size={19} className={isActive ? "text-accent" : "opacity-70"} />
-                      <span>{tab.label}</span>
+                      <Icon size={18} className={isActive ? "text-accent" : "opacity-75"} />
+                      {sidebarOpen && <span className="truncate">{tab.label}</span>}
                     </button>
                   );
                 })}
               </nav>
 
-              {/* Real conversation history */}
-              <div className="space-y-1.5">
-                <div className="px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-ink-muted flex items-center gap-1.5">
-                  <History size={13} />
-                  <span>History</span>
-                </div>
-                {sessions.length === 0 ? (
-                  <p className="px-3 text-xs text-ink-muted italic">No past conversations yet.</p>
-                ) : (
+              {/* Chat History List with Context Dropdown Menu */}
+              {sidebarOpen && (
+                <div className="space-y-4">
+                  {/* Pinned Section */}
+                  {pinnedSessions.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted flex items-center gap-1.5">
+                        <Pin size={11} className="text-accent" />
+                        <span>Pinned</span>
+                      </div>
+                      <div className="space-y-0.5">
+                        {pinnedSessions.map((s) =>
+                          renderSessionRow(s, currentSessionId, editingSessionId, editingSessionText, activeMenuSessionId, {
+                            loadSession, setEditingSessionId, setEditingSessionText, renameSessionOptimistic, togglePinOptimistic, deleteSessionOptimistic, setActiveMenuSessionId
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recents Section */}
                   <div className="space-y-1">
-                    {sessions.map((s) =>
-                      editingSessionId === s.session_id ? (
-                        <div key={s.session_id} className="flex items-center gap-1.5 px-2 py-1">
-                          <input
-                            autoFocus
-                            type="text"
-                            value={editingSessionText}
-                            onChange={(e) => setEditingSessionText(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") renameSession(s.session_id, editingSessionText);
-                              if (e.key === "Escape") setEditingSessionId(null);
-                            }}
-                            className="flex-1 bg-surface border border-accent/50 rounded-lg px-2.5 py-1.5 text-xs text-ink focus:outline-none"
-                          />
-                          <button onClick={() => renameSession(s.session_id, editingSessionText)} className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition cursor-pointer shrink-0">
-                            <Check size={13} />
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          key={s.session_id}
-                          onClick={() => loadSession(s.session_id)}
-                          className={`w-full group flex items-center gap-2 text-left px-3.5 py-2.5 rounded-xl text-xs transition-colors cursor-pointer ${
-                            s.session_id === currentSessionId
-                              ? "bg-surface-2 text-ink border border-border/90"
-                              : "text-ink-muted hover:text-ink hover:bg-surface-2/60"
-                          }`}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate font-medium">{s.title}</p>
-                            <p className="text-[10px] text-ink-muted mt-0.5">{relativeTime(s.last_at)}</p>
-                          </div>
-                          <span
-                            onClick={(e) => { e.stopPropagation(); setEditingSessionId(s.session_id); setEditingSessionText(s.title); }}
-                            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-ink-muted hover:text-accent hover:bg-accent/10 transition-all shrink-0"
-                          >
-                            <Pencil size={13} />
-                          </span>
-                          <span
-                            onClick={(e) => deleteSession(e, s.session_id)}
-                            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-ink-muted hover:text-red-500 hover:bg-red-500/10 transition-all shrink-0"
-                          >
-                            <Trash2 size={13} />
-                          </span>
-                        </button>
-                      )
+                    <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted flex items-center gap-1.5">
+                      <History size={11} />
+                      <span>Recent</span>
+                    </div>
+                    {unpinnedSessions.length === 0 && pinnedSessions.length === 0 ? (
+                      <p className="px-2.5 text-xs text-ink-muted italic">No past chats.</p>
+                    ) : (
+                      <div className="space-y-0.5">
+                        {unpinnedSessions.map((s) =>
+                          renderSessionRow(s, currentSessionId, editingSessionId, editingSessionText, activeMenuSessionId, {
+                            loadSession, setEditingSessionId, setEditingSessionText, renameSessionOptimistic, togglePinOptimistic, deleteSessionOptimistic, setActiveMenuSessionId
+                          })
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="pt-4 border-t border-border/80 space-y-3 relative shrink-0">
+          {/* Bottom Profile Section */}
+          <div className="pt-3 border-t border-border/60 space-y-2 relative shrink-0">
             {showProfile && (
               <ProfilePanel
                 email={currentUserEmail}
@@ -604,25 +615,35 @@ export default function App() {
                 onClose={() => setShowProfile(false)}
               />
             )}
-            <button
-              onClick={() => setShowProfile((v) => !v)}
-              className="w-full flex items-center gap-3 px-2 py-1.5 rounded-xl hover:bg-surface-2/60 transition text-left cursor-pointer"
-            >
-              <div className="w-9 h-9 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center text-accent font-bold text-sm shrink-0">
-                {currentUserEmail[0].toUpperCase()}
-              </div>
-              <div className="flex flex-col min-w-0 flex-1">
-                <span className="text-[10px] uppercase font-bold text-ink-muted tracking-wider">Connected</span>
-                <span className="text-xs font-medium text-ink truncate">{currentUserEmail}</span>
-              </div>
-            </button>
+            
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setShowProfile((v) => !v)}
+                className={`flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-surface-2/60 transition text-left cursor-pointer ${
+                  !sidebarOpen ? "justify-center w-full" : "flex-1 min-w-0"
+                }`}
+              >
+                <div className="w-8 h-8 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center text-accent font-bold text-xs shrink-0">
+                  {currentUserEmail ? currentUserEmail[0].toUpperCase() : "U"}
+                </div>
+                {sidebarOpen && (
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="text-xs font-semibold text-ink truncate">{currentUserEmail}</span>
+                    <span className="text-[10px] text-ink-muted">Connected Account</span>
+                  </div>
+                )}
+              </button>
 
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-red-500 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 rounded-xl transition-all cursor-pointer"
-            >
-              <LogOut size={15} /> Disconnect Account
-            </button>
+              {sidebarOpen && (
+                <button
+                  onClick={() => setIsDark(!isDark)}
+                  className="p-2 rounded-xl text-ink-muted hover:text-ink hover:bg-surface-2 transition cursor-pointer"
+                  title="Toggle Theme"
+                >
+                  {isDark ? <Sun size={16} /> : <Moon size={16} />}
+                </button>
+              )}
+            </div>
           </div>
         </aside>
 
@@ -630,37 +651,37 @@ export default function App() {
         <main className="flex-1 flex flex-col h-full bg-bg relative overflow-hidden">
           {activeTab === "chat" && (
             <div className="flex-1 flex flex-col h-full relative overflow-hidden">
-              <div className="px-8 py-4 border-b border-border/80 bg-surface/40 backdrop-blur-md flex items-center justify-between z-10 shrink-0">
+              <div className="px-6 py-3 border-b border-border/60 bg-surface/30 backdrop-blur-md flex items-center justify-between z-10 shrink-0">
                 <div className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
                   <Sparkles size={14} className="text-accent" />
-                  <span>Autonomous Microsoft 365 Copilot</span>
+                  <span>Autonomous M365 Copilot</span>
                 </div>
-                <div className="flex items-center gap-1.5 text-[11px] text-emerald-500 font-mono bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live Session
+                <div className="flex items-center gap-1.5 text-[11px] text-emerald-500 font-mono bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Connected
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-6 md:px-10 py-8 space-y-6 pb-36 w-full">
+              <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6 pb-36 w-full max-w-4xl mx-auto">
                 {messages.map((msg, index) => {
                   const isStreamingPlaceholder = loading && index === messages.length - 1 && msg.sender === "jarvis" && msg.text === "";
                   return (
                     <div key={index} className={`flex w-full ${msg.sender === "user" ? "justify-end" : "justify-start"}`}>
-                      <div className={`flex gap-3.5 max-w-[88%] ${msg.sender === "user" ? "flex-row-reverse" : "flex-row"}`}>
-                        <div className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 shadow-md ${
+                      <div className={`flex gap-3 max-w-[85%] ${msg.sender === "user" ? "flex-row-reverse" : "flex-row"}`}>
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
                           msg.sender === "jarvis"
                             ? "bg-linear-to-tr from-accent to-purple-600 text-white"
                             : "bg-surface-2 border border-border text-ink font-bold text-xs"
                         }`}>
-                          {msg.sender === "jarvis" ? <Bot size={18} /> : "You"}
+                          {msg.sender === "jarvis" ? <Bot size={16} /> : "You"}
                         </div>
-                        <div className={`px-5 py-4 rounded-3xl shadow-sm min-w-0 wrap-break-word ${
+                        <div className={`px-4 py-3.5 rounded-2xl shadow-sm min-w-0 ${
                           msg.sender === "user"
-                            ? "bg-accent text-accent-ink rounded-tr-none font-medium text-[14.5px] leading-relaxed whitespace-pre-wrap"
-                            : "bg-surface text-ink border border-border/80 rounded-tl-none w-full"
+                            ? "bg-accent text-accent-ink font-medium text-sm leading-relaxed"
+                            : "bg-surface text-ink border border-border/80 w-full"
                         }`}>
                           {isStreamingPlaceholder ? (
                             <span className="flex items-center gap-2 text-xs font-mono text-ink-muted">
-                              <RefreshCcw className="animate-spin" size={13} /> Jarvis is thinking...
+                              <RefreshCcw className="animate-spin" size={13} /> Thinking...
                             </span>
                           ) : msg.sender === "jarvis" ? (
                             <MarkdownMessage text={msg.text} />
@@ -675,111 +696,87 @@ export default function App() {
                 <div ref={chatEndRef} />
               </div>
 
-              <div className="absolute bottom-6 left-0 right-0 px-6 max-w-4xl mx-auto w-full z-20">
+              {/* Centered Floating Prompt Pill */}
+              <div className="absolute bottom-6 left-0 right-0 px-4 max-w-3xl mx-auto w-full z-20">
                 <form
                   onSubmit={handleSendMessage}
-                  className="bg-surface/90 backdrop-blur-2xl border border-border p-2 rounded-full flex gap-3 shadow-2xl focus-within:border-accent transition-all duration-300"
+                  className="bg-surface/95 backdrop-blur-2xl border border-border/80 p-2 rounded-full flex items-center gap-2 shadow-2xl focus-within:border-accent transition-all duration-300"
                 >
                   <input
                     type="text"
                     value={inputMessage}
                     onChange={(e) => setInputMessage(e.target.value)}
-                    placeholder="Ask Jarvis (e.g. 'Summarize unread emails' or 'Schedule a call tomorrow at 3pm')..."
-                    className="flex-1 bg-transparent border-none rounded-full px-5 py-3 text-sm text-ink focus:outline-none placeholder:text-ink-muted/70"
+                    placeholder="Ask Jarvis to search emails, add tasks, or plan events..."
+                    className="flex-1 bg-transparent border-none rounded-full px-4 py-2.5 text-sm text-ink focus:outline-none placeholder:text-ink-muted/70"
                     disabled={loading || !isAuthenticated}
                   />
                   <button
                     type="submit"
-                    className="bg-accent text-accent-ink w-11 h-11 rounded-full flex items-center justify-center hover:opacity-90 transition disabled:opacity-30 active:scale-95 shrink-0 shadow-lg shadow-accent/25 cursor-pointer"
+                    className="bg-accent text-accent-ink w-10 h-10 rounded-full flex items-center justify-center hover:opacity-90 transition disabled:opacity-30 active:scale-95 shrink-0 shadow-md cursor-pointer"
                     disabled={loading || !isAuthenticated || !inputMessage.trim()}
                   >
-                    <Send size={18} />
+                    <Send size={16} />
                   </button>
                 </form>
-                <div className="text-center text-[11px] font-mono text-ink-muted/80 mt-2.5 flex items-center justify-center gap-1">
-                  <ShieldCheck size={13} className="text-emerald-500" />
-                  All email actions wait in Outlook as drafts for safety · {USER_TIMEZONE}
+                <div className="text-center text-[10px] font-mono text-ink-muted/80 mt-2 flex items-center justify-center gap-1">
+                  <ShieldCheck size={12} className="text-emerald-500" />
+                  Jarvis operates safely on draft mode · {USER_TIMEZONE}
                 </div>
               </div>
             </div>
           )}
 
           {activeTab !== "chat" && (
-            <div className="flex-1 p-8 md:p-12 overflow-y-auto space-y-8 max-w-5xl mx-auto w-full">
+            <div className="flex-1 p-6 md:p-10 overflow-y-auto space-y-8 max-w-4xl mx-auto w-full">
               {/* Emails Workspace */}
               {activeTab === "emails" && (
                 <DataCard title="Outlook Mailbox" subtitle="Live view of your recent emails and pending drafts." icon={Mail}>
                   {emails.length === 0 ? (
-                    <div className="text-center py-14 text-ink-muted">
-                      <Mail size={28} className="mx-auto mb-3 opacity-30" />
-                      <p className="text-sm italic">No recent emails found in Outlook.</p>
+                    <div className="text-center py-12 text-ink-muted">
+                      <Mail size={26} className="mx-auto mb-2 opacity-30" />
+                      <p className="text-xs italic">No recent emails found in Outlook.</p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-2.5">
                       {emails.map((m) => (
-                        <motion.div
-                          key={m.id}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="p-4 rounded-2xl bg-surface-2/40 border border-border/60 hover:border-border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all"
-                        >
-                          <div className="min-w-0 flex-1 space-y-1">
-                            <div className="flex items-center gap-2">
+                        <div key={m.id} className="p-3.5 bg-surface-2/40 border border-border/50 rounded-2xl flex items-center justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-semibold text-xs text-ink truncate">{m.sender?.emailAddress?.name || m.sender?.emailAddress?.address || "Unknown"}</span>
                               {m.isDraft && (
-                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
-                                  Draft
-                                </span>
+                                <span className="text-[9px] bg-amber-500/10 text-amber-500 border border-amber-500/20 px-1.5 py-0.5 rounded-full font-mono font-bold">Draft</span>
                               )}
-                              <h4 className="font-semibold text-sm text-ink truncate">
-                                {m.from?.emailAddress?.name || m.sender || "Unknown Sender"}
-                              </h4>
                             </div>
-
                             {editingEmailId === m.id ? (
                               <div className="flex items-center gap-2 mt-1">
                                 <input
                                   type="text"
                                   value={editingEmailSubject}
                                   onChange={(e) => setEditingEmailSubject(e.target.value)}
-                                  className="flex-1 bg-surface border border-accent/50 rounded-lg px-2.5 py-1 text-xs text-ink focus:outline-none"
+                                  className="bg-surface border border-accent rounded-lg px-2.5 py-1 text-xs text-ink flex-1"
                                 />
-                                <button
-                                  onClick={() => updateEmailDraft(m.id, editingEmailSubject)}
-                                  className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition"
-                                >
+                                <button onClick={() => updateEmailDraft(m.id, editingEmailSubject)} className="p-1 text-emerald-500 hover:bg-emerald-500/10 rounded">
                                   <Check size={14} />
                                 </button>
-                                <button
-                                  onClick={() => setEditingEmailId(null)}
-                                  className="p-1.5 text-ink-muted hover:bg-surface-2 rounded-lg transition"
-                                >
+                                <button onClick={() => setEditingEmailId(null)} className="p-1 text-ink-muted hover:bg-surface-2 rounded">
                                   <X size={14} />
                                 </button>
                               </div>
                             ) : (
-                              <p className="text-xs text-ink-muted line-clamp-1">{m.subject || "(No Subject)"}</p>
+                              <p className="text-xs font-medium text-ink/90 truncate">{m.subject || "(No Subject)"}</p>
                             )}
                           </div>
-
-                          <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
-                            {m.isDraft && editingEmailId !== m.id && (
-                              <button
-                                onClick={() => { setEditingEmailId(m.id); setEditingEmailSubject(m.subject || ""); }}
-                                className="p-2 text-ink-muted hover:text-accent hover:bg-accent/10 rounded-xl transition"
-                                title="Edit Draft Subject"
-                              >
-                                <Pencil size={15} />
+                          {m.isDraft && editingEmailId !== m.id && (
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button onClick={() => { setEditingEmailId(m.id); setEditingEmailSubject(m.subject || ""); }} className="p-1.5 text-ink-muted hover:text-accent hover:bg-surface-2 rounded-lg">
+                                <Pencil size={13} />
                               </button>
-                            )}
-                            <button
-                              onClick={() => deleteEmailDraft(m.id)}
-                              className="p-2 text-ink-muted hover:text-red-500 hover:bg-red-500/10 rounded-xl transition"
-                              title="Delete Email / Draft"
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
-                        </motion.div>
+                              <button onClick={() => deleteEmailDraft(m.id)} className="p-1.5 text-ink-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg">
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       ))}
                     </div>
                   )}
@@ -789,215 +786,173 @@ export default function App() {
               {/* Calendar Workspace */}
               {activeTab === "calendar" && (
                 <DataCard
-                  title="Schedule & Events"
-                  subtitle="Manage upcoming events on your Outlook calendar."
+                  title="Outlook Calendar"
+                  subtitle="Your upcoming schedule synced directly from Microsoft 365."
                   icon={Calendar}
                   action={
                     <button
-                      onClick={() => setShowEventForm((v) => !v)}
-                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-accent text-accent-ink text-xs font-semibold hover:opacity-90 transition active:scale-95 shadow-md shadow-accent/20 cursor-pointer"
+                      onClick={() => setShowEventForm(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-accent text-accent-ink rounded-xl text-xs font-semibold hover:opacity-90 transition cursor-pointer"
                     >
-                      <Plus size={15} /> Add Event
+                      <Plus size={14} /> Add Event
                     </button>
                   }
                 >
                   {showEventForm && (
-                    <form onSubmit={submitEvent} className="mb-6 p-4 rounded-2xl bg-surface-2/60 border border-border space-y-3">
-                      <div className="flex justify-between items-center mb-1">
+                    <form onSubmit={submitEvent} className="mb-6 p-4 bg-surface-2/80 border border-border rounded-2xl space-y-3">
+                      <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-ink-muted">
-                          {editingEventId ? "Edit Event" : "Create New Event"}
+                          {editingEventId ? "Edit Event" : "New Event"}
                         </h4>
                         <button type="button" onClick={closeEventForm} className="text-ink-muted hover:text-ink">
-                          <X size={14} />
+                          <X size={15} />
                         </button>
                       </div>
-                      <input
-                        type="text"
-                        placeholder="Event Title / Subject"
-                        value={newEvent.subject}
-                        onChange={(e) => setNewEvent({ ...newEvent, subject: e.target.value })}
-                        className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-xs text-ink focus:outline-none focus:border-accent"
-                        required
-                      />
+                      <div>
+                        <label className="block text-[11px] font-medium text-ink-muted mb-1">Subject</label>
+                        <input
+                          type="text"
+                          required
+                          value={newEvent.subject}
+                          onChange={(e) => setNewEvent({ ...newEvent, subject: e.target.value })}
+                          className="w-full bg-surface border border-border rounded-xl px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-accent"
+                          placeholder="Team Sync..."
+                        />
+                      </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
-                          <label className="text-[10px] text-ink-muted mb-1 block">Start Time</label>
+                          <label className="block text-[11px] font-medium text-ink-muted mb-1">Start Time</label>
                           <input
                             type="datetime-local"
+                            required
                             value={newEvent.start}
                             onChange={(e) => setNewEvent({ ...newEvent, start: e.target.value })}
-                            className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-xs text-ink focus:outline-none focus:border-accent"
-                            required
+                            className="w-full bg-surface border border-border rounded-xl px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-accent"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] text-ink-muted mb-1 block">End Time</label>
+                          <label className="block text-[11px] font-medium text-ink-muted mb-1">End Time</label>
                           <input
                             type="datetime-local"
+                            required
                             value={newEvent.end}
                             onChange={(e) => setNewEvent({ ...newEvent, end: e.target.value })}
-                            className="w-full bg-surface border border-border rounded-xl px-3 py-2 text-xs text-ink focus:outline-none focus:border-accent"
-                            required
+                            className="w-full bg-surface border border-border rounded-xl px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-accent"
                           />
                         </div>
                       </div>
-                      <div className="flex justify-end gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={closeEventForm}
-                          className="px-3 py-1.5 rounded-lg text-xs font-medium text-ink-muted hover:bg-surface-2"
-                        >
+                      <div className="flex justify-end gap-2 pt-2">
+                        <button type="button" onClick={closeEventForm} className="px-3 py-1 text-xs text-ink-muted hover:bg-surface rounded-lg">
                           Cancel
                         </button>
-                        <button
-                          type="submit"
-                          className="px-4 py-1.5 rounded-lg bg-accent text-accent-ink text-xs font-semibold hover:opacity-90"
-                        >
-                          {editingEventId ? "Save Changes" : "Create Event"}
+                        <button type="submit" className="px-3.5 py-1 text-xs font-semibold bg-accent text-accent-ink rounded-lg hover:opacity-90">
+                          {editingEventId ? "Save" : "Create"}
                         </button>
                       </div>
                     </form>
                   )}
 
                   {events.length === 0 ? (
-                    <div className="text-center py-14 text-ink-muted">
-                      <Calendar size={28} className="mx-auto mb-3 opacity-30" />
-                      <p className="text-sm italic">No scheduled events found.</p>
+                    <div className="text-center py-12 text-ink-muted">
+                      <Calendar size={26} className="mx-auto mb-2 opacity-30" />
+                      <p className="text-xs italic">No calendar events found.</p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-2.5">
                       {events.map((evt) => (
-                        <motion.div
-                          key={evt.id}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="p-4 rounded-2xl bg-surface-2/40 border border-border/60 hover:border-border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all"
-                        >
-                          <div className="space-y-1">
-                            <h4 className="font-semibold text-sm text-ink">{evt.subject}</h4>
-                            <p className="text-xs text-ink-muted">
-                              {evt.start?.dateTime ? new Date(evt.start.dateTime).toLocaleString() : "TBD"} -{" "}
-                              {evt.end?.dateTime ? new Date(evt.end.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "TBD"}
+                        <div key={evt.id} className="p-3.5 bg-surface-2/40 border border-border/50 rounded-2xl flex items-center justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-semibold text-xs text-ink truncate">{evt.subject}</h4>
+                            <p className="text-[11px] text-ink-muted mt-0.5 font-mono">
+                              {evt.start?.dateTime ? new Date(evt.start.dateTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : "N/A"}
+                              {" — "}
+                              {evt.end?.dateTime ? new Date(evt.end.dateTime).toLocaleString([], { timeStyle: 'short' }) : "N/A"}
                             </p>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <button
-                              onClick={() => openEditEvent(evt)}
-                              className="p-2 text-ink-muted hover:text-accent hover:bg-accent/10 rounded-xl transition"
-                              title="Edit Event"
-                            >
-                              <Pencil size={15} />
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button onClick={() => openEditEvent(evt)} className="p-1.5 text-ink-muted hover:text-accent hover:bg-surface-2 rounded-lg">
+                              <Pencil size={13} />
                             </button>
-                            <button
-                              onClick={() => deleteEvent(evt.id)}
-                              className="p-2 text-ink-muted hover:text-red-500 hover:bg-red-500/10 rounded-xl transition"
-                              title="Delete Event"
-                            >
-                              <Trash2 size={15} />
+                            <button onClick={() => deleteEvent(evt.id)} className="p-1.5 text-ink-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg">
+                              <Trash2 size={13} />
                             </button>
                           </div>
-                        </motion.div>
+                        </div>
                       ))}
                     </div>
                   )}
                 </DataCard>
               )}
 
-              {/* To-Dos Workspace */}
+              {/* To-Do Workspace */}
               {activeTab === "todos" && (
-                <DataCard title="Task Manager" subtitle="Sync tasks seamlessly with Microsoft To-Do." icon={CheckSquare}>
-                  <form onSubmit={createTodo} className="flex gap-2 mb-6">
+                <DataCard title="Microsoft To-Do" subtitle="Manage your tasks synchronized live with Microsoft To-Do." icon={CheckSquare}>
+                  <form onSubmit={createTodo} className="flex gap-2 mb-5">
                     <input
                       type="text"
-                      placeholder="Add a new task..."
                       value={newTodoTitle}
                       onChange={(e) => setNewTodoTitle(e.target.value)}
-                      className="flex-1 bg-surface-2/60 border border-border rounded-xl px-4 py-2.5 text-xs text-ink focus:outline-none focus:border-accent"
+                      placeholder="Add a new task..."
+                      className="flex-1 bg-surface-2/50 border border-border rounded-xl px-3.5 py-2 text-xs text-ink focus:outline-none focus:border-accent"
                     />
-                    <button
-                      type="submit"
-                      disabled={!newTodoTitle.trim()}
-                      className="px-4 py-2.5 rounded-xl bg-accent text-accent-ink text-xs font-semibold hover:opacity-90 disabled:opacity-40 transition active:scale-95 cursor-pointer"
-                    >
-                      Add Task
+                    <button type="submit" className="px-3.5 py-2 bg-accent text-accent-ink rounded-xl text-xs font-semibold hover:opacity-90 flex items-center gap-1 cursor-pointer">
+                      <Plus size={14} /> Add
                     </button>
                   </form>
 
                   {todos.length === 0 ? (
-                    <div className="text-center py-14 text-ink-muted">
-                      <CheckSquare size={28} className="mx-auto mb-3 opacity-30" />
-                      <p className="text-sm italic">No tasks found in your list.</p>
+                    <div className="text-center py-12 text-ink-muted">
+                      <CheckSquare size={26} className="mx-auto mb-2 opacity-30" />
+                      <p className="text-xs italic">No tasks in your Microsoft To-Do list.</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {todos.map((task) => {
-                        const isDone = task.status === "completed";
-                        return (
-                          <motion.div
-                            key={task.id}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="p-3.5 rounded-2xl bg-surface-2/40 border border-border/60 hover:border-border flex items-center justify-between gap-3 transition-all"
-                          >
-                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                              <button
-                                onClick={() => toggleTodo(task)}
-                                className={`w-5 h-5 rounded-lg border flex items-center justify-center transition cursor-pointer shrink-0 ${
-                                  isDone
-                                    ? "bg-emerald-500 border-emerald-500 text-white"
-                                    : "border-border hover:border-accent"
-                                }`}
-                              >
-                                {isDone && <Check size={12} />}
-                              </button>
-
-                              {editingTodoId === task.id ? (
-                                <div className="flex items-center gap-2 flex-1">
-                                  <input
-                                    type="text"
-                                    value={editingTodoText}
-                                    onChange={(e) => setEditingTodoText(e.target.value)}
-                                    className="flex-1 bg-surface border border-accent/50 rounded-lg px-2.5 py-1 text-xs text-ink focus:outline-none"
-                                  />
-                                  <button
-                                    onClick={() => updateTodoTitle(task.id, editingTodoText)}
-                                    className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition"
-                                  >
-                                    <Check size={14} />
-                                  </button>
-                                  <button
-                                    onClick={() => setEditingTodoId(null)}
-                                    className="p-1.5 text-ink-muted hover:bg-surface-2 rounded-lg transition"
-                                  >
-                                    <X size={14} />
-                                  </button>
-                                </div>
-                              ) : (
-                                <span className={`text-xs font-medium truncate ${isDone ? "line-through text-ink-muted" : "text-ink"}`}>
-                                  {task.title}
-                                </span>
-                              )}
-                            </div>
-
-                            {editingTodoId !== task.id && (
-                              <div className="flex items-center gap-1 shrink-0">
-                                <button
-                                  onClick={() => { setEditingTodoId(task.id); setEditingTodoText(task.title); }}
-                                  className="p-1.5 text-ink-muted hover:text-accent hover:bg-accent/10 rounded-lg transition"
-                                >
-                                  <Pencil size={14} />
+                      {todos.map((task) => (
+                        <div key={task.id} className="p-3 bg-surface-2/40 border border-border/50 rounded-xl flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            <button
+                              onClick={() => toggleTodo(task)}
+                              className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition ${
+                                task.status === "completed"
+                                  ? "bg-emerald-500 border-emerald-500 text-white"
+                                  : "border-border hover:border-accent"
+                              }`}
+                            >
+                              {task.status === "completed" && <Check size={10} />}
+                            </button>
+                            {editingTodoId === task.id ? (
+                              <div className="flex items-center gap-1 flex-1">
+                                <input
+                                  type="text"
+                                  value={editingTodoText}
+                                  onChange={(e) => setEditingTodoText(e.target.value)}
+                                  className="bg-surface border border-accent rounded px-2 py-0.5 text-xs text-ink flex-1"
+                                />
+                                <button onClick={() => updateTodoTitle(task.id, editingTodoText)} className="p-1 text-emerald-500 hover:bg-emerald-500/10 rounded">
+                                  <Check size={12} />
                                 </button>
-                                <button
-                                  onClick={() => deleteTodo(task.id)}
-                                  className="p-1.5 text-ink-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition"
-                                >
-                                  <Trash2 size={14} />
+                                <button onClick={() => setEditingTodoId(null)} className="p-1 text-ink-muted hover:bg-surface-2 rounded">
+                                  <X size={12} />
                                 </button>
                               </div>
+                            ) : (
+                              <span className={`text-xs font-medium truncate ${task.status === "completed" ? "line-through text-ink-muted" : "text-ink"}`}>
+                                {task.title}
+                              </span>
                             )}
-                          </motion.div>
-                        );
-                      })}
+                          </div>
+                          {editingTodoId !== task.id && (
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button onClick={() => { setEditingTodoId(task.id); setEditingTodoText(task.title); }} className="p-1 text-ink-muted hover:text-accent hover:bg-surface-2 rounded">
+                                <Pencil size={12} />
+                              </button>
+                              <button onClick={() => deleteTodo(task.id)} className="p-1 text-ink-muted hover:text-red-500 hover:bg-red-500/10 rounded">
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </DataCard>
@@ -1006,6 +961,108 @@ export default function App() {
           )}
         </main>
       </div>
+    </div>
+  );
+}
+
+// Helper: Render each chat history session row with 3-dot Floating Dropdown Menu
+function renderSessionRow(
+  s,
+  currentSessionId,
+  editingSessionId,
+  editingSessionText,
+  activeMenuSessionId,
+  { loadSession, setEditingSessionId, setEditingSessionText, renameSessionOptimistic, togglePinOptimistic, deleteSessionOptimistic, setActiveMenuSessionId }
+) {
+  if (editingSessionId === s.session_id) {
+    return (
+      <div key={s.session_id} className="flex items-center gap-1 px-1 py-1">
+        <input
+          autoFocus
+          type="text"
+          value={editingSessionText}
+          onChange={(e) => setEditingSessionText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") renameSessionOptimistic(s.session_id, editingSessionText);
+            if (e.key === "Escape") setEditingSessionId(null);
+          }}
+          className="flex-1 bg-surface border border-accent/60 rounded-lg px-2 py-1 text-xs text-ink focus:outline-none"
+        />
+        <button onClick={() => renameSessionOptimistic(s.session_id, editingSessionText)} className="p-1 text-emerald-500 hover:bg-emerald-500/10 rounded-lg cursor-pointer shrink-0">
+          <Check size={13} />
+        </button>
+      </div>
+    );
+  }
+
+  const isMenuOpen = activeMenuSessionId === s.session_id;
+
+  return (
+    <div key={s.session_id} className="relative group">
+      <button
+        onClick={() => loadSession(s.session_id)}
+        className={`w-full flex items-center gap-2 text-left px-3 py-2 rounded-xl text-xs transition-all duration-200 cursor-pointer ${
+          s.session_id === currentSessionId
+            ? "bg-surface-2 text-ink font-semibold shadow-xs border border-border/80"
+            : "text-ink-muted hover:text-ink hover:bg-surface-2/50"
+        }`}
+      >
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[12.5px]">{s.title}</p>
+        </div>
+
+        {/* 3-Dots Button */}
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            setActiveMenuSessionId(isMenuOpen ? null : s.session_id);
+          }}
+          className={`p-1 rounded-lg text-ink-muted hover:text-ink hover:bg-surface transition-opacity duration-150 cursor-pointer shrink-0 ${
+            isMenuOpen ? "opacity-100 bg-surface" : "opacity-0 group-hover:opacity-100"
+          }`}
+          title="More options"
+        >
+          <MoreVertical size={14} />
+        </div>
+      </button>
+
+      {/* Floating Dropdown Menu (Gemini Style) */}
+      {isMenuOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="absolute right-0 top-9 w-44 bg-surface/95 backdrop-blur-2xl border border-border shadow-2xl rounded-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100"
+        >
+          <button
+            onClick={() => togglePinOptimistic(s.session_id)}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-ink hover:bg-surface-2/80 transition text-left cursor-pointer"
+          >
+            {s.isPinned ? <PinOff size={14} className="text-accent" /> : <Pin size={14} className="text-ink-muted" />}
+            <span>{s.isPinned ? "Unpin chat" : "Pin chat"}</span>
+          </button>
+          
+          <button
+            onClick={() => {
+              setEditingSessionId(s.session_id);
+              setEditingSessionText(s.title);
+              setActiveMenuSessionId(null);
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-ink hover:bg-surface-2/80 transition text-left cursor-pointer"
+          >
+            <Pencil size={14} className="text-ink-muted" />
+            <span>Rename</span>
+          </button>
+
+          <div className="my-1 border-t border-border/50" />
+
+          <button
+            onClick={() => deleteSessionOptimistic(s.session_id)}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-red-500 hover:bg-red-500/10 transition text-left cursor-pointer"
+          >
+            <Trash2 size={14} />
+            <span>Delete</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

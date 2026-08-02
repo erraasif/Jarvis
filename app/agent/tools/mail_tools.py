@@ -1,10 +1,22 @@
+from typing import Union
 from langchain_core.tools import tool
 from app.services.graph_client import graph_request
 
 @tool
-def get_emails(user_email: str, top: int = 5):
-    """Fetches recent emails for the user."""
-    return graph_request(user_email, "GET", f"/me/messages?$top={top}&$select=subject,sender,bodyPreview,receivedDateTime,isDraft")
+def get_emails(user_email: str, top: Union[int, str] = 5):
+    """Fetches recent emails for the user. 'top' indicates the number of emails to retrieve."""
+    # Coerce string input from LLM into an integer safely
+    if isinstance(top, str):
+        try:
+            top = int(top)
+        except ValueError:
+            top = 5
+
+    return graph_request(
+        user_email, 
+        "GET", 
+        f"/me/messages?$top={top}&$select=subject,sender,bodyPreview,receivedDateTime,isDraft"
+    )
 
 @tool
 def create_email_draft(user_email: str, recipient: str, subject: str, body: str):
