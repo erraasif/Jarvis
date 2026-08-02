@@ -1,6 +1,6 @@
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
-from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
 from app.agent.state import AgentState
 from app.agent.tools.mail_tools import get_emails, create_email_draft, update_email_draft, delete_email_draft
 from app.agent.tools.calendar_tools import get_calendar_events, create_calendar_event, update_calendar_event, delete_calendar_event
@@ -12,7 +12,11 @@ tools = [
     get_todos, create_todo, update_todo, delete_todo
 ]
 
-llm = ChatOpenAI(model="gpt-4o", temperature=0).bind_tools(tools)
+# Swapped ChatOpenAI for ChatGroq
+llm = ChatGroq(
+    model="llama-3.3-70b-versatile", # Or your preferred Groq model (e.g. llama-3.1-8b-instant)
+    temperature=0
+).bind_tools(tools)
 
 def agent_node(state: AgentState):
     response = llm.invoke(state["messages"])
