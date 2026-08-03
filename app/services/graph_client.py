@@ -33,9 +33,14 @@ def get_valid_access_token(user_email: str) -> str:
     If the token is expired (or close to expiring within 5 minutes), 
     refreshes it via MSAL and updates Supabase automatically.
     """
-    res = supabase.table("users").select("*").eq("email", user_email).execute()
+    # Clean and sanitize the user email to prevent case-sensitivity lookups
+    clean_email = user_email.strip().lower() if user_email else ""
+
+    res = supabase.table("users").select("*").eq("email", clean_email).execute()
+    
     if not res.data:
-        raise Exception(f"User '{user_email}' not found. Please log in through /api/auth/login first.")
+        logger.error(f"User lookup failed for '{clean_email}' in Supabase 'users' table.")
+        raise Exception(f"User '{clean_email}' not found. Please log in through /api/auth/login first.")
 
     user_record = res.data[0]
     
@@ -62,16 +67,16 @@ def get_valid_access_token(user_email: str) -> str:
 
     # 2. Token is expired or expiring soon -> Refresh via MSAL
     if not raw_refresh_token:
-        raise Exception(f"No refresh token available for {user_email}. User must re-authenticate.")
+        raise Exception(f"No refresh token available for {clean_email}. User must re-authenticate.")
 
-    logger.info(f"Access token expired/expiring for {user_email}. Refreshing via MSAL...")
+    logger.info(f"Access token expired/expiring for {clean_email}. Refreshing via MSAL...")
     msal_app = get_msal_app()
     
     result = msal_app.acquire_token_by_refresh_token(raw_refresh_token, scopes=SCOPES)
 
     if "error" in result:
         error_desc = result.get("error_description", "Unknown MSAL error")
-        logger.error(f"Failed to refresh token for {user_email}: {error_desc}")
+        logger.error(f"Failed to refresh token for {clean_email}: {error_desc}")
         raise Exception(f"Authentication session expired. Please log in again. ({error_desc})")
 
     new_access_token = result.get("access_token")
@@ -79,7 +84,7 @@ def get_valid_access_token(user_email: str) -> str:
     expires_in = result.get("expires_in", 3600)
 
     # Persist newly refreshed tokens back to database
-    save_user_tokens(user_email, new_access_token, new_refresh_token, expires_in)
+    save_user_tokens(clean_email, new_access_token, new_refresh_token, expires_in)
     
     return new_access_token
 

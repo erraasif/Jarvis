@@ -1,6 +1,6 @@
 /**
  * Jarvis Dashboard - Enterprise Modern UI
- * Features: Optimistic session state, 3-dot dropdown popover, Pinned chats, Collapsible Drawer
+ * Features: Persisted pinned sessions, 3-dot dropdown popover, Collapsible Drawer
  */
 
 import React, { useState, useEffect, useRef } from "react";
@@ -70,7 +70,6 @@ export default function App() {
   const [actionError, setActionError] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // Active floating dropdown menu ID
   const [activeMenuSessionId, setActiveMenuSessionId] = useState(null);
 
   const chatEndRef = useRef(null);
@@ -122,7 +121,6 @@ export default function App() {
     }
   }, []);
 
-  // Close context menu on outside click
   useEffect(() => {
     const handleClickOutside = () => setActiveMenuSessionId(null);
     window.addEventListener("click", handleClickOutside);
@@ -193,13 +191,11 @@ export default function App() {
     setActiveTab("chat");
   };
 
-  // Instant / Optimistic Delete Session
   const deleteSessionOptimistic = async (sessionId) => {
     setActiveMenuSessionId(null);
     const userEmail = currentUserEmailFor();
     const originalSessions = [...sessions];
 
-    // 1. Immediately update UI
     const updated = sessions.filter((s) => s.session_id !== sessionId);
     setSessions(updated);
 
@@ -208,16 +204,13 @@ export default function App() {
       else handleNewChat();
     }
 
-    // 2. Perform DB delete call in background
     try {
       await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}?user_email=${encodeURIComponent(userEmail)}`, { method: "DELETE" });
     } catch {
-      // Rollback on failure
       setSessions(originalSessions);
     }
   };
 
-  // Instant / Optimistic Rename Session
   const renameSessionOptimistic = async (sessionId, newTitle) => {
     if (!newTitle.trim()) return;
     setActiveMenuSessionId(null);
@@ -225,12 +218,10 @@ export default function App() {
     const userEmail = currentUserEmailFor();
     const originalSessions = [...sessions];
 
-    // 1. Immediately update UI
     setSessions((prev) =>
       prev.map((s) => (s.session_id === sessionId ? { ...s, title: newTitle } : s))
     );
 
-    // 2. Perform DB update in background
     try {
       await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}`, {
         method: "PATCH",
@@ -238,17 +229,33 @@ export default function App() {
         body: JSON.stringify({ user_email: userEmail, title: newTitle }),
       });
     } catch {
-      // Rollback on failure
       setSessions(originalSessions);
     }
   };
 
-  // Instant Pin Toggle
-  const togglePinOptimistic = (sessionId) => {
+  // Now persisted server-side (was previously local-only and reset on
+  // every refresh) — optimistic update with rollback on failure, same
+  // pattern as rename/delete above.
+  const togglePinOptimistic = async (sessionId) => {
     setActiveMenuSessionId(null);
+    const userEmail = currentUserEmailFor();
+    const originalSessions = [...sessions];
+    const target = sessions.find((s) => s.session_id === sessionId);
+    const nextPinned = !target?.isPinned;
+
     setSessions((prev) =>
-      prev.map((s) => (s.session_id === sessionId ? { ...s, isPinned: !s.isPinned } : s))
+      prev.map((s) => (s.session_id === sessionId ? { ...s, isPinned: nextPinned } : s))
     );
+
+    try {
+      await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}/pin`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_email: userEmail, is_pinned: nextPinned }),
+      });
+    } catch {
+      setSessions(originalSessions);
+    }
   };
 
   const handleSendMessage = async (e) => {
@@ -652,7 +659,7 @@ export default function App() {
   </div>
 </aside>
 
-        {/* Workspace View Area */}
+      {/* Workspace View Area */}
         <main className="flex-1 flex flex-col h-full bg-bg relative overflow-hidden">
           {activeTab === "chat" && (
             <div className="flex-1 flex flex-col h-full relative overflow-hidden">

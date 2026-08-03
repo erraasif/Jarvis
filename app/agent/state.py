@@ -16,8 +16,8 @@ class AgentState(TypedDict):
     Attributes:
         messages: Conversation message history with additive reducer.
         user_email: Authenticated user's primary email address.
-        user_timezone: User's IANA timezone string (e.g., 'Asia/Karachi').
+        timezone: User's IANA timezone string (e.g., 'Asia/Karachi').
     """
     messages: Annotated[Sequence[BaseMessage], operator.add]
     user_email: str
-    user_timezone: str
+    timezone: str

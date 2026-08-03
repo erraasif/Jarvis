@@ -20,7 +20,7 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from app.agent.graph import jarvis_agent
 from app.services.supabase_client import (
     save_chat_message, get_chat_history, get_chat_sessions, delete_chat_session,
-    ensure_chat_session, rename_chat_session,
+    ensure_chat_session, rename_chat_session, set_session_pinned,
 )
 
 logger = logging.getLogger(__name__)
@@ -43,10 +43,11 @@ class ChatResponse(BaseModel):
     reply: str
 
 
-def build_system_prompt(timezone: str) -> str:
+def build_system_prompt(timezone: str, user_email: str) -> str:
     """Gives the agent the current date/time in the user's real timezone,
-    plus behavior rules — most importantly, to act on requests directly
-    instead of repeatedly asking for confirmation."""
+    the actual authenticated user's email, and behavior rules — most
+    importantly, to act on requests directly instead of repeatedly asking
+    for confirmation, and to never invent a placeholder email."""
     try:
         tz = ZoneInfo(timezone)
     except (ZoneInfoNotFoundError, TypeError, ValueError):
@@ -59,6 +60,11 @@ def build_system_prompt(timezone: str) -> str:
     offset_fmt = f"{offset[:3]}:{offset[3:]}" if offset else "+00:00"
 
     return f"""You are Jarvis, an autonomous personal assistant for Microsoft 365 (Mail, Calendar, To-Do).
+
+AUTHENTICATED USER: {user_email}
+Every tool you call takes a `user_email` parameter — always pass exactly
+"{user_email}" for it. Never use a placeholder, example, or any other email
+address for that parameter under any circumstance.
 
 CURRENT DATE & TIME: {now_str} ({timezone}, UTC{offset_fmt})
 Use this as "now" for anything relative the user says — "today", "tomorrow",
@@ -83,29 +89,37 @@ BEHAVIOR:
 
 
 def build_initial_state(req: ChatRequest) -> dict:
-    system_prompt = build_system_prompt(req.timezone)
+    """
+    Retrieves historical context and constructs the state dict expected
+    by the AgentState schema in LangGraph.
+    """
+    system_prompt = build_system_prompt(req.timezone or "UTC", req.user_email)
     past_turns = get_chat_history(req.user_email, req.session_id, limit=HISTORY_TURNS_TO_INCLUDE)
+
     history_messages = [
         HumanMessage(content=h["content"]) if h["role"] == "user" else AIMessage(content=h["content"])
         for h in past_turns
     ]
+
     return {
         "messages": [SystemMessage(content=system_prompt), *history_messages, HumanMessage(content=req.message)],
-        "user_email": req.user_email,
+        "user_email": str(req.user_email),
+        "timezone": req.timezone or "UTC",
     }
 
 
 def friendly_error(err_text: str) -> str:
-    if "Incorrect API key" in err_text or "invalid_api_key" in err_text:
-        return "JARVIS cannot connect to the LLM backend — invalid or missing API credentials."
-    if "insufficient_quota" in err_text or "quota" in err_text.lower():
+    """Helper to convert raw tracebacks to user-friendly messages."""
+    if "Incorrect API key" in err_text or "invalid_api_key" in err_text or "AuthenticationError" in err_text:
+        return "JARVIS cannot connect to the LLM backend — invalid or missing API credentials (check GROQ_API_KEY)."
+    if "insufficient_quota" in err_text or "rate_limit" in err_text.lower() or "quota" in err_text.lower():
         return "JARVIS AI capacity limit reached — API rate limit/quota exceeded."
     return f"JARVIS encountered an execution error: {err_text[:200]}"
 
 
 @router.get("/sessions")
 def list_sessions(user_email: EmailStr):
-    """Lists this user's past conversations (id, title, last activity)."""
+    """Lists this user's past conversations (id, title, last activity, pin state)."""
     try:
         return {"sessions": get_chat_sessions(user_email)}
     except Exception as e:
@@ -126,6 +140,7 @@ def chat_history(user_email: EmailStr, session_id: str):
 
 @router.delete("/sessions/{session_id}")
 def remove_session(session_id: str, user_email: EmailStr):
+    """Deletes a chat session by ID."""
     delete_chat_session(user_email, session_id)
     return {"status": "deleted"}
 
@@ -134,10 +149,24 @@ class RenameRequest(BaseModel):
     user_email: EmailStr
     title: str
 
+
 @router.patch("/sessions/{session_id}")
 def rename_session(session_id: str, req: RenameRequest):
+    """Renames an existing chat session."""
     rename_chat_session(req.user_email, session_id, req.title)
     return {"status": "renamed"}
+
+
+class PinRequest(BaseModel):
+    user_email: EmailStr
+    is_pinned: bool
+
+
+@router.patch("/sessions/{session_id}/pin")
+def pin_session(session_id: str, req: PinRequest):
+    """Pins or unpins a chat session — persisted, not just local UI state."""
+    set_session_pinned(req.user_email, session_id, req.is_pinned)
+    return {"status": "pinned" if req.is_pinned else "unpinned"}
 
 
 @router.post("", response_model=ChatResponse)
@@ -166,9 +195,7 @@ def chat_with_jarvis(req: ChatRequest):
 
 @router.post("/stream")
 async def chat_stream_with_jarvis(req: ChatRequest):
-    """Streams the response token-by-token over Server-Sent Events, so the
-    UI can show Jarvis 'typing' live instead of waiting for the full reply —
-    this is also what voice mode will build on next."""
+    """Streams the response token-by-token over Server-Sent Events."""
     initial_state = build_initial_state(req)
 
     async def event_generator():

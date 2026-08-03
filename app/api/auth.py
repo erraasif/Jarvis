@@ -77,7 +77,6 @@ def callback(code: str = None, error: str = None, state: str = "UTC"):
         logger.error(f"Token acquisition failed: {result.get('error_description')}")
         raise HTTPException(status_code=400, detail=result.get("error_description"))
 
-    # Indented properly inside callback function:
     access_token = result.get("access_token")
     refresh_token = result.get("refresh_token")
     expires_in = result.get("expires_in", 3600)
@@ -86,13 +85,16 @@ def callback(code: str = None, error: str = None, state: str = "UTC"):
     headers = {"Authorization": f"Bearer {access_token}"}
     try:
         user_res = httpx.get("https://graph.microsoft.com/v1.0/me", headers=headers, timeout=10.0).json()
-        user_email = user_res.get("mail") or user_res.get("userPrincipalName")
+        raw_email = user_res.get("mail") or user_res.get("userPrincipalName")
     except Exception as exc:
         logger.error(f"Failed to fetch user profile from Microsoft Graph: {exc}")
         raise HTTPException(status_code=500, detail="Failed to fetch user profile.")
 
-    if not user_email:
+    if not raw_email:
         raise HTTPException(status_code=400, detail="Could not determine user email from Graph response.")
+
+    # Clean and sanitize email to prevent case-mismatch issues across Supabase tables
+    user_email = raw_email.strip().lower()
 
     # Save tokens to database
     save_user_tokens(user_email, access_token, refresh_token, expires_in)
@@ -101,6 +103,6 @@ def callback(code: str = None, error: str = None, state: str = "UTC"):
     user_timezone = urllib.parse.quote(state)
     user_email_encoded = urllib.parse.quote(user_email)
 
-    # Redirect user back to frontend with email and timezone context
+    # Redirect user back to frontend with cleaned email and timezone context
     redirect_url = f"{settings.FRONTEND_URL}/?user_email={user_email_encoded}&timezone={user_timezone}"
     return RedirectResponse(redirect_url)

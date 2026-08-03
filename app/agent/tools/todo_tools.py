@@ -15,10 +15,10 @@ def _get_default_todo_list_id(user_email: str) -> str:
     Helper function to dynamically fetch the user's default To-Do list ID.
     Falls back to 'tasks' if list retrieval fails.
     """
+    user_email = user_email.strip().lower()
     try:
         lists = graph_request(user_email, "GET", "/me/todo/lists")
         if lists and "value" in lists and len(lists["value"]) > 0:
-            # Look for the default 'wellknownListName' == 'defaultList', otherwise pick the first list
             for lst in lists["value"]:
                 if lst.get("wellknownListName") == "defaultList":
                     return lst["id"]
@@ -37,6 +37,7 @@ def get_todos(user_email: str, list_id: Optional[str] = None):
         user_email: Authenticated user's primary email.
         list_id: Optional specific list ID. Uses default list if omitted.
     """
+    user_email = user_email.strip().lower()
     target_list_id = list_id or _get_default_todo_list_id(user_email)
     endpoint = f"/me/todo/lists/{target_list_id}/tasks?$select=id,title,status,dueDateTime,createdDateTime"
     return graph_request(user_email, "GET", endpoint)
@@ -60,6 +61,7 @@ def create_todo(
         user_timezone: Target timezone string (e.g. 'Asia/Karachi').
         list_id: Optional specific list ID. Uses default list if omitted.
     """
+    user_email = user_email.strip().lower()
     target_list_id = list_id or _get_default_todo_list_id(user_email)
     payload = {"title": title}
 
@@ -90,6 +92,7 @@ def update_todo(
         status: Target status ('notStarted', 'inProgress', or 'completed'). Defaults to 'completed'.
         list_id: Optional specific list ID. Uses default list if omitted.
     """
+    user_email = user_email.strip().lower()
     target_list_id = list_id or _get_default_todo_list_id(user_email)
     payload = {}
 
@@ -111,5 +114,6 @@ def delete_todo(user_email: str, task_id: str, list_id: Optional[str] = None):
         task_id: Graph API task ID.
         list_id: Optional specific list ID. Uses default list if omitted.
     """
+    user_email = user_email.strip().lower()
     target_list_id = list_id or _get_default_todo_list_id(user_email)
     return graph_request(user_email, "DELETE", f"/me/todo/lists/{target_list_id}/tasks/{task_id}")

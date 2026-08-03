@@ -100,6 +100,22 @@ def rename_chat_session(email: str, session_id: str, new_title: str):
     return response.data
 
 
+def set_session_pinned(email: str, session_id: str, is_pinned: bool):
+    """Persists a session's pinned state — was previously only a local UI
+    toggle that reset on every refresh."""
+    user_id = get_user_id(email)
+    if not user_id:
+        return None
+    response = (
+        supabase.table("chat_sessions")
+        .update({"is_pinned": is_pinned})
+        .eq("id", session_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
+    return response.data
+
+
 def get_chat_history(email: str, session_id: str, limit: int = 200):
     """Returns the messages within one specific conversation session, oldest first."""
     user_id = get_user_id(email)
@@ -124,13 +140,16 @@ def get_chat_sessions(email: str, limit: int = 30):
         return []
     response = (
         supabase.table("chat_sessions")
-        .select("id, title, updated_at")
+        .select("id, title, updated_at, is_pinned")
         .eq("user_id", user_id)
         .order("updated_at", desc=True)
         .limit(limit)
         .execute()
     )
-    return [{"session_id": s["id"], "title": s["title"], "last_at": s["updated_at"]} for s in (response.data or [])]
+    return [
+        {"session_id": s["id"], "title": s["title"], "last_at": s["updated_at"], "isPinned": s.get("is_pinned", False)}
+        for s in (response.data or [])
+    ]
 
 
 def delete_chat_session(email: str, session_id: str):

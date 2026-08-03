@@ -20,6 +20,7 @@ def get_calendar_events(user_email: str, top: int = 10):
         user_email: User's primary email address.
         top: Number of events to retrieve (default 10).
     """
+    user_email = user_email.strip().lower()
     endpoint = f"/me/events?$top={top}&$select=id,subject,start,end,location,bodyPreview&$orderby=start/dateTime ASC"
     return graph_request(user_email, "GET", endpoint)
 
@@ -46,6 +47,8 @@ def create_calendar_event(
         location: Optional meeting location or online link.
         body: Optional description or agenda for the meeting.
     """
+    user_email = user_email.strip().lower()
+    
     # Autonomous Smart Default: Auto-calculate 30 minute end time if not specified
     if not end_time:
         try:
@@ -100,6 +103,7 @@ def update_calendar_event(
         location: Optional updated location name.
         body: Optional updated event body/description.
     """
+    user_email = user_email.strip().lower()
     payload = {}
 
     if subject:
@@ -125,4 +129,5 @@ def delete_calendar_event(user_email: str, event_id: str):
         user_email: User's primary email address.
         event_id: Graph API ID of the event to delete.
     """
+    user_email = user_email.strip().lower()
     return graph_request(user_email, "DELETE", f"/me/events/{event_id}")
