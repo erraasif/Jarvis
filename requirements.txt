@@ -5,14 +5,14 @@ gunicorn
 pydantic
 email-validator
 
-# Microsoft Auth (Fixes ModuleNotFoundError)
+# Microsoft Auth
 msal
 
 # Database & Supabase
 supabase
 postgrest
 
-# LLM & Agent Framework (LangGraph / Groq)
+# LLM & Agent Framework
 langchain
 langgraph
 langchain-groq
@@ -29,5 +29,5 @@ httpx
 requests
 pytz
 
-# Voice API (LiveKit)
+# Voice API (NEW)
 livekit

@@ -1,3 +1,4 @@
+# voice_agent/agent.py
 import asyncio
 import json
 import sys
@@ -6,10 +7,8 @@ from datetime import datetime
 import pytz
 import os
 
-# Add parent directory to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Import tools from app
 from app.agent.tools.calendar_tools import (
     get_calendar_events, create_calendar_event, update_calendar_event, delete_calendar_event
 )
@@ -20,19 +19,15 @@ from app.agent.tools.todo_tools import (
     get_todos, create_todo, update_todo, delete_todo
 )
 
-# ✅ CORRECT IMPORTS FOR LIVEKIT 1.6.8
 from livekit import agents
 from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli
 from livekit.agents.voice import Agent
-from livekit.agents import vad
-from livekit.plugins import deepgram, elevenlabs  # ✅ These packages need to be installed
+from livekit.agents import VAD  # ✅ Correct import
+from livekit.plugins import deepgram, elevenlabs
 
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
 
-# ============================================
-# TOOLS MAP
-# ============================================
 TOOLS_MAP = {
     "get_calendar_events": get_calendar_events,
     "create_calendar_event": create_calendar_event,
@@ -48,18 +43,8 @@ TOOLS_MAP = {
     "delete_todo": delete_todo,
 }
 
-# ============================================
-# LLM SETUP
-# ============================================
-llm = ChatGroq(
-    model="llama-3.3-70b-versatile",
-    temperature=0,
-    api_key=os.getenv("GROQ_API_KEY")
-)
+llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0, api_key=os.getenv("GROQ_API_KEY"))
 
-# ============================================
-# SYSTEM PROMPT
-# ============================================
 def get_dynamic_system_prompt(user_email: str, user_timezone: str = "UTC") -> str:
     try:
         tz = pytz.timezone(user_timezone)
@@ -81,26 +66,21 @@ CORE RULES:
 2. IMMEDIATE EXECUTION - NEVER ask for confirmation.
 3. HARD CONSTRAINT: NEVER send emails directly - only create drafts.
 4. Use current date/time for relative references.
-5. After executing a tool, reply with a clear summary.
-"""
+5. After executing a tool, reply with a clear summary."""
 
-# ============================================
-# AGENT CLASS - ERROR FREE
-# ============================================
 class JarvisVoiceAgent(Agent):
     def __init__(self, ctx: JobContext):
         super().__init__(
             ctx=ctx,
             stt=deepgram.STT(api_key=os.getenv("DEEPGRAM_API_KEY")),
             tts=elevenlabs.TTS(api_key=os.getenv("ELEVENLABS_API_KEY")),
-            vad=vad.DEFAULT,
+            vad=VAD.DEFAULT,  # ✅ Fixed: VAD.DEFAULT
         )
         self.user_email = None
         self.user_timezone = "UTC"
         self.messages = []
 
     async def on_enter(self):
-        """Called when agent enters the room"""
         participant = self.ctx.room.local_participant
         if participant.metadata:
             try:
@@ -119,7 +99,6 @@ class JarvisVoiceAgent(Agent):
         await self.say("Jarvis ready!")
 
     async def on_user_utterance(self, utterance):
-        """Called when user speaks"""
         user_text = utterance.text
         if not user_text:
             return
@@ -128,9 +107,7 @@ class JarvisVoiceAgent(Agent):
 
         while True:
             llm_with_tools = llm.bind_tools(list(TOOLS_MAP.values()))
-            response = await asyncio.get_running_loop().run_in_executor(
-                None, llm_with_tools.invoke, self.messages
-            )
+            response = await asyncio.get_running_loop().run_in_executor(None, llm_with_tools.invoke, self.messages)
             self.messages.append(response)
 
             if not response.tool_calls:
@@ -155,13 +132,8 @@ class JarvisVoiceAgent(Agent):
                 else:
                     result = f"Tool {tool_name} not found"
 
-                self.messages.append(
-                    ToolMessage(content=result, tool_call_id=tool_call["id"])
-                )
+                self.messages.append(ToolMessage(content=result, tool_call_id=tool_call["id"]))
 
-# ============================================
-# ENTRYPOINT
-# ============================================
 async def entrypoint(ctx: JobContext):
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
     agent = JarvisVoiceAgent(ctx)

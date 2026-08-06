@@ -1,9 +1,10 @@
 # app/api/voice.py
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from livekit import api
 import os
 import json
+import jwt
+import time
 
 router = APIRouter(prefix="/api/voice", tags=["Voice"])
 
@@ -15,17 +16,27 @@ class TokenRequest(BaseModel):
 async def get_voice_token(request: TokenRequest):
     """Generate LiveKit token for frontend to connect"""
     try:
-        token = api.AccessToken(
-            os.getenv("LIVEKIT_API_KEY", "devkey"),
-            os.getenv("LIVEKIT_API_SECRET", "secret")
-        ).with_identity(request.user_email) \
-         .with_metadata(json.dumps({
-             "email": request.user_email,
-             "timezone": request.timezone
-         })) \
-         .with_name("Jarvis User") \
-         .to_jwt()
-        
+        # Simple JWT token generation (no livekit.api needed)
+        token = jwt.encode(
+            {
+                "iss": os.getenv("LIVEKIT_API_KEY", "devkey"),
+                "exp": int(time.time()) + 3600,
+                "nbf": int(time.time()) - 10,
+                "sub": request.user_email,
+                "video": {
+                    "room": "jarvis-room",
+                    "roomJoin": True,
+                    "canPublish": True,
+                    "canSubscribe": True
+                },
+                "metadata": json.dumps({
+                    "email": request.user_email,
+                    "timezone": request.timezone
+                })
+            },
+            os.getenv("LIVEKIT_API_SECRET", "secret"),
+            algorithm="HS256"
+        )
         return {"token": token}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
