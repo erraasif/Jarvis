@@ -19,10 +19,11 @@ from app.agent.tools.todo_tools import (
     get_todos, create_todo, update_todo, delete_todo
 )
 
+# ✅ CORRECT IMPORTS
 from livekit import agents
 from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli
 from livekit.agents.voice import Agent
-from livekit.agents import VAD  # ✅ Correct import
+from livekit.agents import vad  # ✅ LOWERCASE - FIXED!
 from livekit.plugins import deepgram, elevenlabs
 
 from langchain_groq import ChatGroq
@@ -74,7 +75,7 @@ class JarvisVoiceAgent(Agent):
             ctx=ctx,
             stt=deepgram.STT(api_key=os.getenv("DEEPGRAM_API_KEY")),
             tts=elevenlabs.TTS(api_key=os.getenv("ELEVENLABS_API_KEY")),
-            vad=VAD.DEFAULT,  # ✅ Fixed: VAD.DEFAULT
+            vad=vad.DEFAULT,  # ✅ FIXED: lowercase vad
         )
         self.user_email = None
         self.user_timezone = "UTC"
