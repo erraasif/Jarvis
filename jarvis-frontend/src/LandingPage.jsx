@@ -10,6 +10,10 @@ import {
   Sparkles,
   Lock,
   Cpu,
+  Mic,
+  Zap,
+  Globe,
+  Bot,
 } from "lucide-react";
 import Logo from "./Logo";
 import { ThemeToggle } from "./ThemeToggle";
@@ -181,6 +185,17 @@ function Interactive3DCore({ isDark }) {
         >
           <CheckSquare className="w-4 h-4 md:w-5 md:h-5 text-emerald-400" />
         </motion.div>
+
+        {/* Voice Badge - New */}
+        <motion.div
+          animate={{ scale: [1, 1.05, 1] }}
+          transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+          style={{ transform: "translateZ(60px)" }}
+          className="absolute bottom-0 right-0 z-20 px-3 py-1.5 rounded-full bg-accent/20 backdrop-blur-xl border border-accent/40 text-[10px] font-mono font-bold text-accent flex items-center gap-1.5"
+        >
+          <Mic size={10} className="animate-pulse" />
+          <span>Voice Ready</span>
+        </motion.div>
       </motion.div>
     </div>
   );
@@ -192,32 +207,35 @@ const features = [
     label: "Mailbox",
     title: "Reads, never sends without you",
     body: "Ask Jarvis to summarize your inbox or draft a reply. Every draft waits safely in Outlook for your review.",
+    color: "from-blue-500/20 to-blue-600/10",
   },
   {
     icon: Calendar,
     label: "Calendar",
     title: "Full control over schedule",
     body: "Create, reschedule, or cancel events by describing them in natural conversational language.",
+    color: "from-purple-500/20 to-purple-600/10",
   },
   {
     icon: CheckSquare,
     label: "Tasks",
     title: "Your Microsoft To-Do, spoken",
     body: "Add, complete, or reorganize tasks in a single prompt without manual form filing.",
+    color: "from-emerald-500/20 to-emerald-600/10",
   },
 ];
 
-function FeatureCard({ icon: Icon, label, title, body, index }) {
+function FeatureCard({ icon: Icon, label, title, body, index, color }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 40 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.4 }}
       transition={{ duration: 0.5, delay: index * 0.12, ease: [0.16, 1, 0.3, 1] }}
-      whileHover={{ y: -6 }}
+      whileHover={{ y: -6, scale: 1.01 }}
       className="card-energy-ring group relative p-6 rounded-3xl bg-surface/60 backdrop-blur-md border border-border/70 overflow-hidden text-left transition-all duration-300 shadow-lg shadow-black/20"
     >
-      <div className="pointer-events-none absolute -inset-1 rounded-3xl bg-accent/0 group-hover:bg-accent/[0.08] blur-xl transition-all duration-500" />
+      <div className={`pointer-events-none absolute -inset-1 rounded-3xl bg-gradient-to-br ${color} opacity-0 group-hover:opacity-100 blur-xl transition-all duration-500`} />
 
       <motion.div
         whileHover={{ rotate: [0, -8, 8, 0], scale: 1.08 }}
@@ -237,6 +255,12 @@ function FeatureCard({ icon: Icon, label, title, body, index }) {
 
 export default function LandingPage({ onLogin, isDark, setIsDark }) {
   const [activeTab, setActiveTab] = useState("mail");
+  const [isVoiceSupported, setIsVoiceSupported] = useState(true);
+
+  useEffect(() => {
+    // Check if browser supports WebRTC
+    setIsVoiceSupported(!!navigator.mediaDevices?.getUserMedia);
+  }, []);
 
   const handleLogin =
     onLogin ||
@@ -249,29 +273,49 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
       prompt: "Draft a follow-up email to Alex regarding yesterday's project review.",
       status: "Reading recent thread context from Outlook...",
       action: "Draft generated and saved in Outlook Drafts.",
+      emoji: "📧",
     },
     calendar: {
       prompt: "Schedule a 30-min sync with Alex tomorrow at 3 PM.",
       status: "Resolving 'tomorrow 3pm' against your local timezone...",
       action: "Calendar event created on your Outlook calendar.",
+      emoji: "📅",
     },
     tasks: {
       prompt: "Add 'Review Q3 financial roadmap' to my priority tasks.",
       status: "Syncing with Microsoft To-Do...",
       action: "Task added to your Microsoft To-Do list.",
+      emoji: "✅",
     },
   };
 
   return (
     <div className="relative min-h-screen bg-bg text-ink transition-colors duration-300 flex flex-col items-center justify-between overflow-hidden selection:bg-accent/30">
       
+      {/* Background Glow Effect */}
+      <div className="fixed inset-0 pointer-events-none -z-10">
+        <div className="absolute top-[-40%] left-[-20%] w-[600px] h-[600px] rounded-full bg-accent/10 blur-[120px]" />
+        <div className="absolute bottom-[-40%] right-[-20%] w-[600px] h-[600px] rounded-full bg-[color:var(--color-glow-2)]/10 blur-[120px]" />
+      </div>
+
       {/* Header */}
       <header className="relative z-20 max-w-5xl w-full px-6 py-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Logo size={32} />
           <span className="font-display font-bold text-lg tracking-tight text-glow">Jarvis</span>
+          <span className="ml-2 px-2 py-0.5 rounded-full bg-accent/20 text-accent text-[9px] font-mono font-bold tracking-wider border border-accent/30">
+            v2.0
+          </span>
         </div>
-        <ThemeToggle isDark={isDark} setIsDark={setIsDark} />
+        <div className="flex items-center gap-3">
+          {isVoiceSupported && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-mono text-emerald-400">
+              <Mic size={11} />
+              <span className="hidden sm:inline">Voice Ready</span>
+            </div>
+          )}
+          <ThemeToggle isDark={isDark} setIsDark={setIsDark} />
+        </div>
       </header>
 
       {/* Main Content Hero */}
@@ -283,6 +327,9 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
         >
           <Sparkles size={13} className="animate-pulse" />
           <span>Autonomous Assistant for M365</span>
+          <span className="w-1 h-1 rounded-full bg-accent/50" />
+          <Zap size={11} className="text-accent" />
+          <span>LiveKit Voice</span>
         </motion.div>
 
         {/* 3D Particle Orbit Core Visualizer */}
@@ -314,7 +361,7 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
           className="mt-4 text-sm sm:text-base max-w-lg leading-relaxed text-ink-muted"
         >
           Tell Jarvis what you need. It reasons over requests and acts directly on
-          Outlook Mail, Calendar, and To-Do with complete precision.
+          Outlook Mail, Calendar, and To-Do with complete precision — now with <span className="text-accent font-semibold">voice</span>.
         </motion.p>
 
         {/* Sign-in Button */}
@@ -337,9 +384,21 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 text-[11px] font-mono text-ink-muted">
-            <ShieldCheck size={13} className="text-emerald-400" />
-            <span>Authenticated via Microsoft Entra ID</span>
+          <div className="flex items-center gap-3 text-[11px] font-mono text-ink-muted">
+            <div className="flex items-center gap-1.5">
+              <ShieldCheck size={13} className="text-emerald-400" />
+              <span>Microsoft Entra ID</span>
+            </div>
+            <span className="opacity-30">•</span>
+            <div className="flex items-center gap-1.5">
+              <Globe size={13} className="text-accent" />
+              <span>OAuth 2.0</span>
+            </div>
+            <span className="opacity-30">•</span>
+            <div className="flex items-center gap-1.5">
+              <Bot size={13} className="text-purple-400" />
+              <span>LLM Powered</span>
+            </div>
           </div>
         </motion.div>
 
@@ -350,9 +409,8 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
           ))}
         </div>
 
-        {/* ================= TERMIAL PLAYGROUND WITH FUTURISTIC GLOW ================= */}
+        {/* Terminal Playground */}
         <div className="relative mt-16 w-full">
-          {/* Dual Volumetric Light Source behind the Terminal */}
           <div className="absolute -top-12 left-1/4 w-[400px] h-[250px] bg-accent/25 blur-[100px] rounded-full pointer-events-none -z-10" />
           <div className="absolute -bottom-10 right-1/4 w-[400px] h-[250px] bg-[color:var(--color-glow-2)]/20 blur-[110px] rounded-full pointer-events-none -z-10" />
 
@@ -377,7 +435,9 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
                       activeTab === tab ? "bg-accent text-accent-ink shadow-md shadow-accent/30" : "text-ink-muted hover:text-ink"
                     }`}
                   >
-                    {tab}
+                    {tab === "mail" && "📧"}
+                    {tab === "calendar" && "📅"}
+                    {tab === "tasks" && "✅"} {tab}
                   </button>
                 ))}
               </div>
@@ -391,9 +451,11 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
                   <span className="ml-2 text-[10px] font-sans text-ink-muted/80">jarvis-agent-executor</span>
                 </div>
-                <div className="flex items-center gap-1 text-[10px] text-accent font-semibold">
+                <div className="flex items-center gap-2 text-[10px] text-accent font-semibold">
                   <Cpu size={12} className="animate-pulse" />
                   <span>Active</span>
+                  <span className="w-1 h-1 rounded-full bg-accent/50" />
+                  <span className="text-emerald-400">● Live</span>
                 </div>
               </div>
 
@@ -434,9 +496,20 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
             <span>Tokens Encrypted at Rest</span>
           </div>
           <span className="opacity-40">•</span>
-          <div>OAuth2 Encrypted Session</div>
+          <div className="flex items-center gap-1.5">
+            <ShieldCheck size={13} className="text-emerald-400" />
+            <span>OAuth2 Encrypted Session</span>
+          </div>
           <span className="opacity-40">•</span>
-          <div>Microsoft Graph Native</div>
+          <div className="flex items-center gap-1.5">
+            <Globe size={13} className="text-accent" />
+            <span>Microsoft Graph Native</span>
+          </div>
+          <span className="opacity-40">•</span>
+          <div className="flex items-center gap-1.5">
+            <Mic size={13} className="text-purple-400" />
+            <span>LiveKit Voice</span>
+          </div>
         </div>
       </main>
     </div>

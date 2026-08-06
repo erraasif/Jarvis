@@ -1,6 +1,6 @@
 /**
  * Jarvis Dashboard - Enterprise Modern UI
- * Features: Persisted pinned sessions, 3-dot dropdown popover, Collapsible Drawer
+ * Features: Persisted pinned sessions, 3-dot dropdown popover, Collapsible Drawer, Voice Mode
  */
 
 import React, { useState, useEffect, useRef } from "react";
@@ -8,10 +8,12 @@ import {
   MessageSquare, Mail, Calendar, CheckSquare,
   Send, Bot, RefreshCcw, Sparkles, ShieldCheck, Sun, Moon,
   Plus, Trash2, X, AlertCircle, Pencil, Check, History,
-  PanelLeftClose, PanelLeft, MoreVertical, Pin, PinOff
+  PanelLeftClose, MoreVertical, Pin, PinOff,
+  Mic, MicOff, Volume2
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Room } from 'livekit-client';
 
 import LandingPage from "./LandingPage.jsx";
 import Logo from "./Logo.jsx";
@@ -19,6 +21,7 @@ import ProfilePanel, { applyStoredAccent } from "./ProfilePanel.jsx";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "https://jarvis-backend-h38f.onrender.com";
 const USER_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL || "wss://jarvis-i1h3f3dn.livekit.cloud";
 
 const TABS = [
   { id: "chat", label: "Agent Assistant", icon: MessageSquare },
@@ -62,6 +65,7 @@ function MarkdownMessage({ text }) {
 }
 
 export default function App() {
+  // ============ STATE ============
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeTab, setActiveTab] = useState("chat");
   const [inputMessage, setInputMessage] = useState("");
@@ -69,17 +73,48 @@ export default function App() {
   const [showProfile, setShowProfile] = useState(false);
   const [actionError, setActionError] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-
   const [activeMenuSessionId, setActiveMenuSessionId] = useState(null);
-
   const chatEndRef = useRef(null);
 
+  // Voice state
+  const [voiceConnected, setVoiceConnected] = useState(false);
+  const [voiceConnecting, setVoiceConnecting] = useState(false);
+  const [voiceError, setVoiceError] = useState("");
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const voiceRoomRef = useRef(null);
+
+  // Theme
   const [isDark, setIsDark] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("theme") === "dark" ||
       (!("theme" in localStorage) && window.matchMedia("(prefers-color-scheme: dark)").matches);
   });
 
+  // Data states
+  const [messages, setMessages] = useState([INITIAL_MESSAGE]);
+  const [emails, setEmails] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [todos, setTodos] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [currentSessionId, setCurrentSessionId] = useState(null);
+  const [editingSessionId, setEditingSessionId] = useState(null);
+  const [editingSessionText, setEditingSessionText] = useState("");
+
+  // CRUD states
+  const [editingEmailId, setEditingEmailId] = useState(null);
+  const [editingEmailSubject, setEditingEmailSubject] = useState("");
+  const [newTodoTitle, setNewTodoTitle] = useState("");
+  const [editingTodoId, setEditingTodoId] = useState(null);
+  const [editingTodoText, setEditingTodoText] = useState("");
+  const [showEventForm, setShowEventForm] = useState(false);
+  const [editingEventId, setEditingEventId] = useState(null);
+  const [newEvent, setNewEvent] = useState({ subject: "", start: "", end: "" });
+
+  // ============ HELPERS ============
+  const currentUserEmailFor = () => localStorage.getItem("jarvis_user_email") || "";
+
+  // ============ EFFECTS ============
+  // Theme effect
   useEffect(() => {
     const root = document.documentElement;
     if (isDark) {
@@ -91,22 +126,12 @@ export default function App() {
     }
   }, [isDark]);
 
+  // Accent color
   useEffect(() => {
     applyStoredAccent();
   }, []);
 
-  const [messages, setMessages] = useState([INITIAL_MESSAGE]);
-  const [emails, setEmails] = useState([]);
-  const [events, setEvents] = useState([]);
-  const [todos, setTodos] = useState([]);
-
-  const [sessions, setSessions] = useState([]);
-  const [currentSessionId, setCurrentSessionId] = useState(null);
-  const [editingSessionId, setEditingSessionId] = useState(null);
-  const [editingSessionText, setEditingSessionText] = useState("");
-
-  const currentUserEmailFor = () => localStorage.getItem("jarvis_user_email") || "";
-
+  // Authentication
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const userEmail = urlParams.get("user_email");
@@ -121,12 +146,130 @@ export default function App() {
     }
   }, []);
 
+  // Click outside handler for dropdown
   useEffect(() => {
     const handleClickOutside = () => setActiveMenuSessionId(null);
     window.addEventListener("click", handleClickOutside);
     return () => window.removeEventListener("click", handleClickOutside);
   }, []);
 
+  // Load sessions on auth
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    refreshSessions().then((list) => {
+      if (list.length > 0) {
+        loadSession(list[0].session_id);
+      } else {
+        setCurrentSessionId(crypto.randomUUID());
+      }
+    });
+  }, [isAuthenticated]);
+
+  // Fetch data on tab change
+  useEffect(() => {
+    if (isAuthenticated) {
+      if (activeTab === "emails") fetchEmails();
+      if (activeTab === "calendar") fetchEvents();
+      if (activeTab === "todos") fetchTodos();
+    }
+  }, [activeTab, isAuthenticated]);
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    if (activeTab === "chat") {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, activeTab]);
+
+  // ============ VOICE CONNECTION ============
+  const connectVoice = async () => {
+    const userEmail = currentUserEmailFor();
+    if (!userEmail) {
+      setVoiceError("Please sign in first");
+      return;
+    }
+
+    if (voiceConnected) {
+      if (voiceRoomRef.current) {
+        await voiceRoomRef.current.disconnect();
+        voiceRoomRef.current = null;
+      }
+      setVoiceConnected(false);
+      setIsSpeaking(false);
+      return;
+    }
+
+    setVoiceConnecting(true);
+    setVoiceError("");
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/voice/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_email: userEmail,
+          timezone: USER_TIMEZONE
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to get token: ${response.status}`);
+      }
+
+      const { token } = await response.json();
+
+      const room = new Room({
+        audioCaptureDefaults: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+        adaptiveStream: true,
+        dynacast: true,
+      });
+
+      room.on('connected', () => {
+        setVoiceConnected(true);
+        setVoiceConnecting(false);
+        setVoiceError("");
+        console.log('🎤 Voice connected!');
+      });
+
+      room.on('disconnected', () => {
+        setVoiceConnected(false);
+        setIsSpeaking(false);
+        console.log('🎤 Voice disconnected');
+      });
+
+      room.on('participantConnected', (participant) => {
+        if (participant.identity === 'jarvis-agent') {
+          setIsSpeaking(true);
+        }
+      });
+
+      room.on('participantDisconnected', (participant) => {
+        if (participant.identity === 'jarvis-agent') {
+          setIsSpeaking(false);
+        }
+      });
+
+      room.on('trackSubscribed', (track) => {
+        if (track.kind === 'audio') {
+          console.log('🔊 Audio track received');
+        }
+      });
+
+      await room.connect(LIVEKIT_URL, token);
+      voiceRoomRef.current = room;
+
+    } catch (error) {
+      console.error('Voice connection error:', error);
+      setVoiceError(error.message || 'Failed to connect voice');
+      setVoiceConnecting(false);
+    }
+  };
+
+  // ============ SESSION MANAGEMENT ============
   const refreshSessions = () => {
     const userEmail = currentUserEmailFor();
     if (!userEmail) return Promise.resolve([]);
@@ -157,33 +300,18 @@ export default function App() {
     }
   };
 
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    refreshSessions().then((list) => {
-      if (list.length > 0) {
-        loadSession(list[0].session_id);
-      } else {
-        setCurrentSessionId(crypto.randomUUID());
-      }
-    });
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      if (activeTab === "emails") fetchEmails();
-      if (activeTab === "calendar") fetchEvents();
-      if (activeTab === "todos") fetchTodos();
-    }
-  }, [activeTab, isAuthenticated]);
-
-  useEffect(() => {
-    if (activeTab === "chat") {
-      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages, activeTab]);
-
+  // ============ AUTH HANDLERS ============
   const handleLogin = () => { window.location.href = `${API_BASE_URL}/api/auth/login`; };
-  const handleLogout = () => { localStorage.removeItem("jarvis_user_email"); setIsAuthenticated(false); };
+  
+  const handleLogout = () => {
+    if (voiceRoomRef.current) {
+      voiceRoomRef.current.disconnect();
+      voiceRoomRef.current = null;
+    }
+    setVoiceConnected(false);
+    localStorage.removeItem("jarvis_user_email");
+    setIsAuthenticated(false);
+  };
 
   const handleNewChat = () => {
     setCurrentSessionId(crypto.randomUUID());
@@ -191,11 +319,11 @@ export default function App() {
     setActiveTab("chat");
   };
 
+  // ============ SESSION CRUD ============
   const deleteSessionOptimistic = async (sessionId) => {
     setActiveMenuSessionId(null);
     const userEmail = currentUserEmailFor();
     const originalSessions = [...sessions];
-
     const updated = sessions.filter((s) => s.session_id !== sessionId);
     setSessions(updated);
 
@@ -233,9 +361,6 @@ export default function App() {
     }
   };
 
-  // Now persisted server-side (was previously local-only and reset on
-  // every refresh) — optimistic update with rollback on failure, same
-  // pattern as rename/delete above.
   const togglePinOptimistic = async (sessionId) => {
     setActiveMenuSessionId(null);
     const userEmail = currentUserEmailFor();
@@ -258,6 +383,7 @@ export default function App() {
     }
   };
 
+  // ============ CHAT HANDLER ============
   const handleSendMessage = async (e) => {
     if (e) e.preventDefault();
     const userEmail = currentUserEmailFor();
@@ -266,7 +392,6 @@ export default function App() {
     const userMsg = inputMessage;
     setInputMessage("");
     setLoading(true);
-
     setMessages((prev) => [...prev, { sender: "user", text: userMsg }, { sender: "jarvis", text: "" }]);
 
     const appendToReply = (chunk) => {
@@ -300,7 +425,6 @@ export default function App() {
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-
         const parts = buffer.split("\n\n");
         buffer = parts.pop();
 
@@ -322,6 +446,7 @@ export default function App() {
     }
   };
 
+  // ============ DATA FETCHING ============
   const fetchData = async (endpoint, setter) => {
     try {
       const userEmail = currentUserEmailFor();
@@ -339,15 +464,7 @@ export default function App() {
   const fetchEvents = () => fetchData("/events", setEvents);
   const fetchTodos = () => fetchData("/todos", setTodos);
 
-  const [editingEmailId, setEditingEmailId] = useState(null);
-  const [editingEmailSubject, setEditingEmailSubject] = useState("");
-  const [newTodoTitle, setNewTodoTitle] = useState("");
-  const [editingTodoId, setEditingTodoId] = useState(null);
-  const [editingTodoText, setEditingTodoText] = useState("");
-  const [showEventForm, setShowEventForm] = useState(false);
-  const [editingEventId, setEditingEventId] = useState(null);
-  const [newEvent, setNewEvent] = useState({ subject: "", start: "", end: "" });
-
+  // ============ API HELPERS ============
   const handleApiResult = async (res, onSuccess) => {
     if (res.ok) {
       setActionError("");
@@ -358,6 +475,7 @@ export default function App() {
     }
   };
 
+  // ============ EMAIL CRUD ============
   const updateEmailDraft = async (emailId, newSubject) => {
     if (!newSubject.trim()) return;
     const userEmail = currentUserEmailFor();
@@ -375,6 +493,7 @@ export default function App() {
     await handleApiResult(res, fetchEmails);
   };
 
+  // ============ TODO CRUD ============
   const createTodo = async (e) => {
     e.preventDefault();
     if (!newTodoTitle.trim()) return;
@@ -415,6 +534,7 @@ export default function App() {
     await handleApiResult(res, fetchTodos);
   };
 
+  // ============ EVENT CRUD ============
   const submitEvent = async (e) => {
     e.preventDefault();
     if (!newEvent.subject || !newEvent.start || !newEvent.end) return;
@@ -463,13 +583,13 @@ export default function App() {
     await handleApiResult(res, fetchEvents);
   };
 
+  // ============ RENDER HELPERS ============
   const currentUserEmail = currentUserEmailFor() || "Connected Account";
-
   const pinnedSessions = sessions.filter((s) => s.isPinned);
   const unpinnedSessions = sessions.filter((s) => !s.isPinned);
 
   const DataCard = ({ title, subtitle, children, icon: Icon, action }) => (
-    <div className="bg-surface/80 backdrop-blur-xl border border-border rounded-3xl p-6 md:p-8 shadow-xl transition-all duration-300">
+    <div className="bg-surface/80 backdrop-blur-xl border border-border rounded-3xl p-6 md:p-8 shadow-xl transition-all duration-300 card-3d depth-layer-1">
       <div className="flex items-center justify-between gap-3.5 mb-6 pb-5 border-b border-border/80">
         <div className="flex items-center gap-3.5">
           <div className="p-3 bg-surface-2 border border-border rounded-2xl text-accent shadow-inner">
@@ -492,6 +612,7 @@ export default function App() {
     </div>
   );
 
+  // ============ RENDER ============
   if (!isAuthenticated) {
     return <LandingPage onLogin={handleLogin} isDark={isDark} setIsDark={setIsDark} />;
   }
@@ -499,180 +620,223 @@ export default function App() {
   return (
     <div className="min-h-screen bg-bg text-ink font-body selection:bg-accent/30 transition-colors duration-300">
       <div className="flex h-screen overflow-hidden">
-       {/* Sleek Collapsible Modern Sidebar */}
-<aside
-  className={`${
-    sidebarOpen ? "w-64 md:w-72" : "w-16"
-  } bg-surface/80 backdrop-blur-2xl border-r border-border/70 p-3.5 flex flex-col justify-between relative z-20 shrink-0 transition-all duration-300 ease-in-out`}
->
-  <div className="flex flex-col h-full overflow-hidden">
-    {/* Top Bar with Sidebar Toggle */}
-    <div className="flex items-center justify-between mb-4 pb-3 border-b border-border/60 shrink-0">
-      {sidebarOpen ? (
-        <div className="flex items-center gap-2.5 px-1">
-          <Logo size={30} />
-          <span className="font-display font-bold text-lg tracking-tight text-ink">Jarvis</span>
-        </div>
-      ) : (
-        <button 
-          onClick={() => setSidebarOpen(true)}
-          className="mx-auto p-1.5 rounded-xl hover:bg-surface-2 transition cursor-pointer"
-          title="Expand sidebar"
+        {/* Sidebar */}
+        <aside
+          className={`${
+            sidebarOpen ? "w-64 md:w-72" : "w-16"
+          } bg-surface/80 backdrop-blur-2xl border-r border-border/70 p-3.5 flex flex-col justify-between relative z-20 shrink-0 transition-all duration-300 ease-in-out card-3d depth-layer-2 holo-glow`}
         >
-          <Logo size={24} />
-        </button>
-      )}
-      
-      <button
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        className={`p-2 rounded-xl text-ink-muted hover:text-ink hover:bg-surface-2 transition cursor-pointer ${!sidebarOpen ? "hidden" : ""}`}
-        title="Collapse sidebar"
-      >
-        <PanelLeftClose size={18} />
-      </button>
-    </div>
+          <div className="flex flex-col h-full overflow-hidden">
+            {/* Top Bar */}
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-border/60 shrink-0">
+              {sidebarOpen ? (
+                <div className="flex items-center gap-2.5 px-1">
+                  <Logo size={30} />
+                  <span className="font-display font-bold text-lg tracking-tight text-ink">Jarvis</span>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => setSidebarOpen(true)}
+                  className="mx-auto p-1.5 rounded-xl hover:bg-surface-2 transition cursor-pointer"
+                  title="Expand sidebar"
+                >
+                  <Logo size={24} />
+                </button>
+              )}
+              <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className={`p-2 rounded-xl text-ink-muted hover:text-ink hover:bg-surface-2 transition cursor-pointer ${!sidebarOpen ? "hidden" : ""}`}
+                title="Collapse sidebar"
+              >
+                <PanelLeftClose size={18} />
+              </button>
+            </div>
 
-    {/* New Chat Button */}
-    <button
-      onClick={handleNewChat}
-      className={`w-full mb-4 flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-accent text-accent-ink font-semibold hover:opacity-90 transition-all shadow-md shadow-accent/15 cursor-pointer active:scale-[0.98] shrink-0 ${
-        !sidebarOpen ? "px-0" : ""
-      }`}
-      title="New Chat"
-    >
-      <Plus size={18} />
-      {sidebarOpen && <span className="text-sm">New Chat</span>}
-    </button>
-
-    <div className="flex-1 overflow-y-auto space-y-5 pr-0.5 min-h-0 custom-scrollbar">
-      {/* Workspace Apps */}
-      <nav className="space-y-1">
-        {sidebarOpen && (
-          <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted">
-            Workspace
-          </div>
-        )}
-        {TABS.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
+            {/* New Chat Button */}
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              title={!sidebarOpen ? tab.label : undefined}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-[0.98] cursor-pointer ${
-                isActive
-                  ? "bg-surface-2 text-ink shadow-sm border border-border/80"
-                  : "text-ink-muted hover:bg-surface-2/60 hover:text-ink"
-              } ${!sidebarOpen ? "justify-center px-0" : ""}`}
+              onClick={handleNewChat}
+              className={`w-full mb-4 flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-accent text-accent-ink font-semibold hover:opacity-90 transition-all shadow-md shadow-accent/15 cursor-pointer active:scale-[0.98] shrink-0 ${
+                !sidebarOpen ? "px-0" : ""
+              }`}
+              title="New Chat"
             >
-              <Icon size={18} className={isActive ? "text-accent" : "opacity-75"} />
-              {sidebarOpen && <span className="truncate">{tab.label}</span>}
+              <Plus size={18} />
+              {sidebarOpen && <span className="text-sm">New Chat</span>}
             </button>
-          );
-        })}
-      </nav>
 
-      {/* Chat History List with Context Dropdown Menu */}
-      {sidebarOpen && (
-        <div className="space-y-4">
-          {/* Pinned Section */}
-          {pinnedSessions.length > 0 && (
-            <div className="space-y-1">
-              <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted flex items-center gap-1.5">
-                <Pin size={11} className="text-accent" />
-                <span>Pinned</span>
-              </div>
-              <div className="space-y-0.5">
-                {pinnedSessions.map((s) =>
-                  renderSessionRow(s, currentSessionId, editingSessionId, editingSessionText, activeMenuSessionId, {
-                    loadSession, setEditingSessionId, setEditingSessionText, renameSessionOptimistic, togglePinOptimistic, deleteSessionOptimistic, setActiveMenuSessionId
-                  })
+            <div className="flex-1 overflow-y-auto space-y-5 pr-0.5 min-h-0 custom-scrollbar">
+              {/* Workspace Apps */}
+              <nav className="space-y-1">
+                {sidebarOpen && (
+                  <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted">
+                    Workspace
+                  </div>
                 )}
-              </div>
-            </div>
-          )}
+                {TABS.map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      title={!sidebarOpen ? tab.label : undefined}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-[0.98] cursor-pointer ${
+                        isActive
+                          ? "bg-surface-2 text-ink shadow-sm border border-border/80"
+                          : "text-ink-muted hover:bg-surface-2/60 hover:text-ink"
+                      } ${!sidebarOpen ? "justify-center px-0" : ""}`}
+                    >
+                      <Icon size={18} className={isActive ? "text-accent" : "opacity-75"} />
+                      {sidebarOpen && <span className="truncate">{tab.label}</span>}
+                    </button>
+                  );
+                })}
+              </nav>
 
-          {/* Recents Section */}
-          <div className="space-y-1">
-            <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted flex items-center gap-1.5">
-              <History size={11} />
-              <span>Recent</span>
+              {/* Chat History */}
+              {sidebarOpen && (
+                <div className="space-y-4">
+                  {pinnedSessions.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted flex items-center gap-1.5">
+                        <Pin size={11} className="text-accent" />
+                        <span>Pinned</span>
+                      </div>
+                      <div className="space-y-0.5">
+                        {pinnedSessions.map((s) =>
+                          renderSessionRow(s, currentSessionId, editingSessionId, editingSessionText, activeMenuSessionId, {
+                            loadSession, setEditingSessionId, setEditingSessionText, renameSessionOptimistic, togglePinOptimistic, deleteSessionOptimistic, setActiveMenuSessionId
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted flex items-center gap-1.5">
+                      <History size={11} />
+                      <span>Recent</span>
+                    </div>
+                    {unpinnedSessions.length === 0 && pinnedSessions.length === 0 ? (
+                      <p className="px-2.5 text-xs text-ink-muted italic">No past chats.</p>
+                    ) : (
+                      <div className="space-y-0.5">
+                        {unpinnedSessions.map((s) =>
+                          renderSessionRow(s, currentSessionId, editingSessionId, editingSessionText, activeMenuSessionId, {
+                            loadSession, setEditingSessionId, setEditingSessionText, renameSessionOptimistic, togglePinOptimistic, deleteSessionOptimistic, setActiveMenuSessionId
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-            {unpinnedSessions.length === 0 && pinnedSessions.length === 0 ? (
-              <p className="px-2.5 text-xs text-ink-muted italic">No past chats.</p>
-            ) : (
-              <div className="space-y-0.5">
-                {unpinnedSessions.map((s) =>
-                  renderSessionRow(s, currentSessionId, editingSessionId, editingSessionText, activeMenuSessionId, {
-                    loadSession, setEditingSessionId, setEditingSessionText, renameSessionOptimistic, togglePinOptimistic, deleteSessionOptimistic, setActiveMenuSessionId
-                  })
-                )}
-              </div>
+          </div>
+
+          {/* Bottom Profile Section */}
+          <div className="pt-3 border-t border-border/60 space-y-2 relative shrink-0">
+            {showProfile && (
+              <ProfilePanel
+                email={currentUserEmail}
+                isDark={isDark}
+                setIsDark={setIsDark}
+                onLogout={handleLogout}
+                onClose={() => setShowProfile(false)}
+              />
             )}
+            
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setShowProfile((v) => !v)}
+                className={`flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-surface-2/60 transition text-left cursor-pointer ${
+                  !sidebarOpen ? "justify-center w-full" : "flex-1 min-w-0"
+                }`}
+              >
+                <div className="w-8 h-8 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center text-accent font-bold text-xs shrink-0">
+                  {currentUserEmail ? currentUserEmail[0].toUpperCase() : "U"}
+                </div>
+                {sidebarOpen && (
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="text-xs font-semibold text-ink truncate">{currentUserEmail}</span>
+                    <span className="text-[10px] text-ink-muted">Connected Account</span>
+                  </div>
+                )}
+              </button>
+
+              {sidebarOpen && (
+                <button
+                  onClick={() => setIsDark(!isDark)}
+                  className="p-2 rounded-xl text-ink-muted hover:text-ink hover:bg-surface-2 transition cursor-pointer"
+                  title="Toggle Theme"
+                >
+                  {isDark ? <Sun size={16} /> : <Moon size={16} />}
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-      )}
-    </div>
-  </div>
+        </aside>
 
-  {/* Bottom Profile Section */}
-  <div className="pt-3 border-t border-border/60 space-y-2 relative shrink-0">
-    {showProfile && (
-      <ProfilePanel
-        email={currentUserEmail}
-        isDark={isDark}
-        setIsDark={setIsDark}
-        onLogout={handleLogout}
-        onClose={() => setShowProfile(false)}
-      />
-    )}
-    
-    <div className="flex items-center justify-between">
-      <button
-        onClick={() => setShowProfile((v) => !v)}
-        className={`flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-surface-2/60 transition text-left cursor-pointer ${
-          !sidebarOpen ? "justify-center w-full" : "flex-1 min-w-0"
-        }`}
-      >
-        <div className="w-8 h-8 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center text-accent font-bold text-xs shrink-0">
-          {currentUserEmail ? currentUserEmail[0].toUpperCase() : "U"}
-        </div>
-        {sidebarOpen && (
-          <div className="flex flex-col min-w-0 flex-1">
-            <span className="text-xs font-semibold text-ink truncate">{currentUserEmail}</span>
-            <span className="text-[10px] text-ink-muted">Connected Account</span>
-          </div>
-        )}
-      </button>
-
-      {sidebarOpen && (
-        <button
-          onClick={() => setIsDark(!isDark)}
-          className="p-2 rounded-xl text-ink-muted hover:text-ink hover:bg-surface-2 transition cursor-pointer"
-          title="Toggle Theme"
-        >
-          {isDark ? <Sun size={16} /> : <Moon size={16} />}
-        </button>
-      )}
-    </div>
-  </div>
-</aside>
-
-      {/* Workspace View Area */}
-        <main className="flex-1 flex flex-col h-full bg-bg relative overflow-hidden">
+        {/* Main Content */}
+        <main className="flex-1 flex flex-col h-full bg-bg relative overflow-hidden depth-layer-1">
           {activeTab === "chat" && (
             <div className="flex-1 flex flex-col h-full relative overflow-hidden">
+              {/* Header */}
               <div className="px-6 py-3 border-b border-border/60 bg-surface/30 backdrop-blur-md flex items-center justify-between z-10 shrink-0">
                 <div className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
                   <Sparkles size={14} className="text-accent" />
                   <span>Autonomous M365 Copilot</span>
                 </div>
-                <div className="flex items-center gap-1.5 text-[11px] text-emerald-500 font-mono bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Connected
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-500 font-mono bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Connected
+                  </div>
+                  {/* Voice Button */}
+                  <button
+                    onClick={connectVoice}
+                    disabled={voiceConnecting}
+                    className={`
+                      relative flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 cursor-pointer
+                      ${voiceConnected 
+                        ? 'bg-red-500/20 text-red-500 border border-red-500/30 hover:bg-red-500/30' 
+                        : voiceConnecting
+                        ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30 animate-pulse cursor-wait'
+                        : 'bg-accent/20 text-accent border border-accent/30 hover:bg-accent/30'
+                      }
+                    `}
+                    title={voiceConnected ? "Disconnect voice" : "Connect voice"}
+                  >
+                    {voiceConnecting ? (
+                      <>
+                        <RefreshCcw size={14} className="animate-spin" />
+                        <span className="hidden sm:inline">Connecting...</span>
+                      </>
+                    ) : voiceConnected ? (
+                      <>
+                        {isSpeaking ? <Volume2 size={14} className="animate-pulse" /> : <MicOff size={14} />}
+                        <span className="hidden sm:inline">{isSpeaking ? 'Jarvis Speaking' : 'Voice On'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mic size={14} />
+                        <span className="hidden sm:inline">Voice Mode</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
 
+              {/* Voice Error */}
+              {voiceError && (
+                <div className="px-4 py-2 bg-red-500/10 border-b border-red-500/20 text-red-500 text-xs flex items-center gap-2">
+                  <AlertCircle size={14} />
+                  <span>{voiceError}</span>
+                  <button onClick={() => setVoiceError('')} className="ml-auto hover:text-red-400">
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+
+              {/* Messages */}
               <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6 pb-36 w-full max-w-4xl mx-auto">
                 {messages.map((msg, index) => {
                   const isStreamingPlaceholder = loading && index === messages.length - 1 && msg.sender === "jarvis" && msg.text === "";
@@ -689,7 +853,7 @@ export default function App() {
                         <div className={`px-4 py-3.5 rounded-2xl shadow-sm min-w-0 ${
                           msg.sender === "user"
                             ? "bg-accent text-accent-ink font-medium text-sm leading-relaxed"
-                            : "bg-surface text-ink border border-border/80 w-full"
+                            : "bg-surface text-ink border border-border/80 w-full card-3d depth-layer-1"
                         }`}>
                           {isStreamingPlaceholder ? (
                             <span className="flex items-center gap-2 text-xs font-mono text-ink-muted">
@@ -708,7 +872,7 @@ export default function App() {
                 <div ref={chatEndRef} />
               </div>
 
-              {/* Centered Floating Prompt Pill */}
+              {/* Input */}
               <div className="absolute bottom-6 left-0 right-0 px-4 max-w-3xl mx-auto w-full z-20">
                 <form
                   onSubmit={handleSendMessage}
@@ -718,10 +882,15 @@ export default function App() {
                     type="text"
                     value={inputMessage}
                     onChange={(e) => setInputMessage(e.target.value)}
-                    placeholder="Ask Jarvis to search emails, add tasks, or plan events..."
+                    placeholder={voiceConnected ? "💬 Type or speak to Jarvis..." : "Ask Jarvis to search emails, add tasks, or plan events..."}
                     className="flex-1 bg-transparent border-none rounded-full px-4 py-2.5 text-sm text-ink focus:outline-none placeholder:text-ink-muted/70"
                     disabled={loading || !isAuthenticated}
                   />
+                  {voiceConnected && (
+                    <div className="flex items-center gap-1">
+                      <div className={`w-2 h-2 rounded-full ${isSpeaking ? 'bg-accent animate-pulse' : 'bg-emerald-500'}`} />
+                    </div>
+                  )}
                   <button
                     type="submit"
                     className="bg-accent text-accent-ink w-10 h-10 rounded-full flex items-center justify-center hover:opacity-90 transition disabled:opacity-30 active:scale-95 shrink-0 shadow-md cursor-pointer"
@@ -733,14 +902,18 @@ export default function App() {
                 <div className="text-center text-[10px] font-mono text-ink-muted/80 mt-2 flex items-center justify-center gap-1">
                   <ShieldCheck size={12} className="text-emerald-500" />
                   Jarvis operates safely on draft mode · {USER_TIMEZONE}
+                  {voiceConnected && (
+                    <span className="ml-2 text-accent">· 🎤 Voice active</span>
+                  )}
                 </div>
               </div>
             </div>
           )}
 
+          {/* Other Tabs */}
           {activeTab !== "chat" && (
             <div className="flex-1 p-6 md:p-10 overflow-y-auto space-y-8 max-w-4xl mx-auto w-full">
-              {/* Emails Workspace */}
+              {/* Emails */}
               {activeTab === "emails" && (
                 <DataCard title="Outlook Mailbox" subtitle="Live view of your recent emails and pending drafts." icon={Mail}>
                   {emails.length === 0 ? (
@@ -751,7 +924,7 @@ export default function App() {
                   ) : (
                     <div className="space-y-2.5">
                       {emails.map((m) => (
-                        <div key={m.id} className="p-3.5 bg-surface-2/40 border border-border/50 rounded-2xl flex items-center justify-between gap-3">
+                        <div key={m.id} className="p-3.5 bg-surface-2/40 border border-border/50 rounded-2xl flex items-center justify-between gap-3 card-3d depth-layer-1">
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="font-semibold text-xs text-ink truncate">{m.sender?.emailAddress?.name || m.sender?.emailAddress?.address || "Unknown"}</span>
@@ -795,7 +968,7 @@ export default function App() {
                 </DataCard>
               )}
 
-              {/* Calendar Workspace */}
+              {/* Calendar */}
               {activeTab === "calendar" && (
                 <DataCard
                   title="Outlook Calendar"
@@ -811,7 +984,7 @@ export default function App() {
                   }
                 >
                   {showEventForm && (
-                    <form onSubmit={submitEvent} className="mb-6 p-4 bg-surface-2/80 border border-border rounded-2xl space-y-3">
+                    <form onSubmit={submitEvent} className="mb-6 p-4 bg-surface-2/80 border border-border rounded-2xl space-y-3 card-3d depth-layer-1">
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-ink-muted">
                           {editingEventId ? "Edit Event" : "New Event"}
@@ -872,7 +1045,7 @@ export default function App() {
                   ) : (
                     <div className="space-y-2.5">
                       {events.map((evt) => (
-                        <div key={evt.id} className="p-3.5 bg-surface-2/40 border border-border/50 rounded-2xl flex items-center justify-between gap-3">
+                        <div key={evt.id} className="p-3.5 bg-surface-2/40 border border-border/50 rounded-2xl flex items-center justify-between gap-3 card-3d depth-layer-1">
                           <div className="min-w-0 flex-1">
                             <h4 className="font-semibold text-xs text-ink truncate">{evt.subject}</h4>
                             <p className="text-[11px] text-ink-muted mt-0.5 font-mono">
@@ -896,7 +1069,7 @@ export default function App() {
                 </DataCard>
               )}
 
-              {/* To-Do Workspace */}
+              {/* Todos */}
               {activeTab === "todos" && (
                 <DataCard title="Microsoft To-Do" subtitle="Manage your tasks synchronized live with Microsoft To-Do." icon={CheckSquare}>
                   <form onSubmit={createTodo} className="flex gap-2 mb-5">
@@ -920,7 +1093,7 @@ export default function App() {
                   ) : (
                     <div className="space-y-2">
                       {todos.map((task) => (
-                        <div key={task.id} className="p-3 bg-surface-2/40 border border-border/50 rounded-xl flex items-center justify-between gap-3">
+                        <div key={task.id} className="p-3 bg-surface-2/40 border border-border/50 rounded-xl flex items-center justify-between gap-3 card-3d depth-layer-1">
                           <div className="flex items-center gap-2.5 min-w-0 flex-1">
                             <button
                               onClick={() => toggleTodo(task)}
@@ -977,7 +1150,7 @@ export default function App() {
   );
 }
 
-// Helper: Render each chat history session row with 3-dot Floating Dropdown Menu
+// ============ SESSION ROW HELPER ============
 function renderSessionRow(
   s,
   currentSessionId,
@@ -1023,7 +1196,6 @@ function renderSessionRow(
           <p className="truncate text-[12.5px]">{s.title}</p>
         </div>
 
-        {/* 3-Dots Button */}
         <div
           onClick={(e) => {
             e.stopPropagation();
@@ -1038,7 +1210,6 @@ function renderSessionRow(
         </div>
       </button>
 
-      {/* Floating Dropdown Menu (Gemini Style) */}
       {isMenuOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
