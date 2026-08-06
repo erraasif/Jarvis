@@ -1,4 +1,4 @@
-# voice_agent/agent.py - SIMPLE VERSION
+# voice_agent/agent.py
 import asyncio
 import json
 import sys
@@ -21,19 +21,11 @@ from app.agent.tools.todo_tools import (
     get_todos, create_todo, update_todo, delete_todo
 )
 
-# LiveKit imports - SIMPLE
+# LiveKit imports - SIMPLE & CORRECT
 from livekit import agents
 from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli
-from livekit.agents.voice import Agent
+from livekit.agents import Agent, AgentSession  # ✅ CORRECT: Use Agent, AgentSession
 
-# Import STT and TTS directly
-from livekit.agents.stt import STT
-from livekit.agents.tts import TTS
-
-# Import VAD
-from livekit.agents import vad
-
-# LangChain imports
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
 
@@ -92,22 +84,17 @@ CORE RULES:
 """
 
 # ============================================
-# AGENT CLASS
+# AGENT CLASS - CORRECT FOR LATEST LIVEKIT
 # ============================================
 class JarvisVoiceAgent(Agent):
     def __init__(self, ctx: JobContext):
-        # Use basic STT/TTS - no plugins
-        super().__init__(
-            ctx=ctx,
-            stt=STT(),  # Basic STT
-            tts=TTS(),  # Basic TTS
-            vad=vad.DEFAULT,
-        )
+        super().__init__(ctx=ctx)
         self.user_email = None
         self.user_timezone = "UTC"
         self.messages = []
 
     async def on_enter(self):
+        """Called when agent enters the room"""
         participant = self.ctx.room.local_participant
         if participant.metadata:
             try:
@@ -125,8 +112,9 @@ class JarvisVoiceAgent(Agent):
         self.messages = [SystemMessage(content=system_content)]
         await self.say("Jarvis ready!")
 
-    async def on_user_utterance(self, utterance: agents.Utterance):
-        user_text = utterance.text
+    async def on_message(self, message: agents.types.Message):
+        """Called when user sends a message (text or voice)"""
+        user_text = message.text
         if not user_text:
             return
 
