@@ -1,4 +1,3 @@
-# voice_agent/agent.py
 import asyncio
 import json
 import sys
@@ -21,10 +20,12 @@ from app.agent.tools.todo_tools import (
     get_todos, create_todo, update_todo, delete_todo
 )
 
-# LiveKit imports - SIMPLE & CORRECT
+# ✅ CORRECT IMPORTS FOR LIVEKIT 1.6.8
 from livekit import agents
 from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli
-from livekit.agents import Agent, AgentSession  # ✅ CORRECT: Use Agent, AgentSession
+from livekit.agents.voice import Agent
+from livekit.agents import vad
+from livekit.plugins import deepgram, elevenlabs  # ✅ These packages need to be installed
 
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
@@ -84,11 +85,16 @@ CORE RULES:
 """
 
 # ============================================
-# AGENT CLASS - CORRECT FOR LATEST LIVEKIT
+# AGENT CLASS - ERROR FREE
 # ============================================
 class JarvisVoiceAgent(Agent):
     def __init__(self, ctx: JobContext):
-        super().__init__(ctx=ctx)
+        super().__init__(
+            ctx=ctx,
+            stt=deepgram.STT(api_key=os.getenv("DEEPGRAM_API_KEY")),
+            tts=elevenlabs.TTS(api_key=os.getenv("ELEVENLABS_API_KEY")),
+            vad=vad.DEFAULT,
+        )
         self.user_email = None
         self.user_timezone = "UTC"
         self.messages = []
@@ -112,9 +118,9 @@ class JarvisVoiceAgent(Agent):
         self.messages = [SystemMessage(content=system_content)]
         await self.say("Jarvis ready!")
 
-    async def on_message(self, message: agents.types.Message):
-        """Called when user sends a message (text or voice)"""
-        user_text = message.text
+    async def on_user_utterance(self, utterance):
+        """Called when user speaks"""
+        user_text = utterance.text
         if not user_text:
             return
 
