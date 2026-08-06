@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.api import auth, chat, emails, events, todos
+from app.api import auth, chat, emails, events, todos, voice  # ✅ voice add kiya
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +50,7 @@ app.include_router(chat.router)
 app.include_router(emails.router)
 app.include_router(events.router)
 app.include_router(todos.router)
+app.include_router(voice.router)  # ✅ Voice router add kiya
 
 
 @app.get("/health", tags=["Health Check"])

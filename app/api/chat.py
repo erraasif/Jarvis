@@ -4,18 +4,21 @@ Chat Router Endpoints
 Provides HTTP REST and Server-Sent Events (SSE) streaming routes for
 interacting with the JARVIS autonomous agent and accessing historical logs,
 organized into real, switchable conversation sessions.
+
+The system prompt (user identity, current date/time, autonomy rules) is
+built inside app/agent/graph.py's agent_node — NOT here — so there's a
+single source of truth and every request doesn't carry two stacked system
+messages.
 """
 
 import logging
 import traceback
-from datetime import datetime
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import anyio
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, EmailStr
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import HumanMessage, AIMessage
 
 from app.agent.graph import jarvis_agent
 from app.services.supabase_client import (
@@ -43,57 +46,14 @@ class ChatResponse(BaseModel):
     reply: str
 
 
-def build_system_prompt(timezone: str, user_email: str) -> str:
-    """Gives the agent the current date/time in the user's real timezone,
-    the actual authenticated user's email, and behavior rules — most
-    importantly, to act on requests directly instead of repeatedly asking
-    for confirmation, and to never invent a placeholder email."""
-    try:
-        tz = ZoneInfo(timezone)
-    except (ZoneInfoNotFoundError, TypeError, ValueError):
-        tz = ZoneInfo("UTC")
-        timezone = "UTC"
-
-    now = datetime.now(tz)
-    now_str = now.strftime("%A, %B %d, %Y, %H:%M")
-    offset = now.strftime("%z")
-    offset_fmt = f"{offset[:3]}:{offset[3:]}" if offset else "+00:00"
-
-    return f"""You are Jarvis, an autonomous personal assistant for Microsoft 365 (Mail, Calendar, To-Do).
-
-AUTHENTICATED USER: {user_email}
-Every tool you call takes a `user_email` parameter — always pass exactly
-"{user_email}" for it. Never use a placeholder, example, or any other email
-address for that parameter under any circumstance.
-
-CURRENT DATE & TIME: {now_str} ({timezone}, UTC{offset_fmt})
-Use this as "now" for anything relative the user says — "today", "tomorrow",
-"next Monday", "in an hour", "at 3pm" — and resolve it to an absolute local
-datetime (no offset, e.g. "2026-08-02T15:00:00") plus the timezone name
-{timezone} before calling any calendar tool.
-
-BEHAVIOR:
-- Act directly. When the user asks you to do something (book a meeting, add a
-  task, draft an email, delete an event) and you have enough information to
-  do it, call the tool immediately — do not ask "should I go ahead?" or
-  repeat the request back for confirmation first. Just do it, then report
-  what you did in one short summary.
-- Only ask a clarifying question when a genuinely required detail is missing
-  and cannot be reasonably inferred (e.g. no time was given at all for an
-  event). Ask once, specifically, then act on the answer — don't re-confirm
-  after that.
-- Never send email. Mail actions are drafts only — this is a hard rule.
-- Keep replies concise and conversational. Use markdown (lists, bold) where
-  it aids clarity, not for its own sake.
-"""
-
-
 def build_initial_state(req: ChatRequest) -> dict:
     """
     Retrieves historical context and constructs the state dict expected
-    by the AgentState schema in LangGraph.
+    by the AgentState schema in LangGraph. No system message is added
+    here — agent_node in graph.py builds it fresh every call using
+    state["user_email"] and state["timezone"], so it always has the
+    current time and never risks getting out of sync with this file.
     """
-    system_prompt = build_system_prompt(req.timezone or "UTC", req.user_email)
     past_turns = get_chat_history(req.user_email, req.session_id, limit=HISTORY_TURNS_TO_INCLUDE)
 
     history_messages = [
@@ -102,7 +62,7 @@ def build_initial_state(req: ChatRequest) -> dict:
     ]
 
     return {
-        "messages": [SystemMessage(content=system_prompt), *history_messages, HumanMessage(content=req.message)],
+        "messages": [*history_messages, HumanMessage(content=req.message)],
         "user_email": str(req.user_email),
         "timezone": req.timezone or "UTC",
     }

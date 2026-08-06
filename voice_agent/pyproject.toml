@@ -1,0 +1,17 @@
+[project]
+name = "jarvis-voice"
+version = "1.0.0"
+description = "Jarvis Voice Assistant"
+requires-python = ">=3.10"
+dependencies = [
+    "livekit",
+    "livekit-agents",
+    "deepgram-sdk",
+    "elevenlabs",
+    "langchain-groq",
+    "langchain-core",
+    "python-dotenv",
+    "pytz",
+]
+[project.scripts]
+jarvis-voice = "agent:entrypoint"

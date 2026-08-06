@@ -6,20 +6,19 @@ Contains LangChain tool definitions for inspecting and managing Outlook emails.
 
 from typing import Annotated
 from langchain_core.tools import tool
-from langchain_core.tools.base import InjectedState
+from langgraph.prebuilt import InjectedState
 from app.services.graph_client import graph_request
 
 
 @tool
 def get_emails(
-    user_email: Annotated[str, InjectedState("user_email")], 
+    user_email: Annotated[str, InjectedState("user_email")],
     top: int = 5
 ):
     """
     Fetches recent emails for the user.
     'top' indicates the number of emails to retrieve (must be an integer, e.g. 5 or 10).
     """
-    # Safe runtime coercion in case LLM passes string number
     if isinstance(top, str):
         try:
             top = int(top)
@@ -27,17 +26,17 @@ def get_emails(
             top = 5
 
     return graph_request(
-        user_email, 
-        "GET", 
+        user_email,
+        "GET",
         f"/me/messages?$top={top}&$select=subject,sender,bodyPreview,receivedDateTime,isDraft"
     )
 
 
 @tool
 def create_email_draft(
-    user_email: Annotated[str, InjectedState("user_email")], 
-    recipient: str, 
-    subject: str, 
+    user_email: Annotated[str, InjectedState("user_email")],
+    recipient: str,
+    subject: str,
     body: str
 ):
     """Drafts an email in Outlook. NEVER sends it automatically."""
@@ -51,9 +50,9 @@ def create_email_draft(
 
 @tool
 def update_email_draft(
-    user_email: Annotated[str, InjectedState("user_email")], 
-    email_id: str, 
-    subject: str = None, 
+    user_email: Annotated[str, InjectedState("user_email")],
+    email_id: str,
+    subject: str = None,
     body: str = None
 ):
     """
@@ -70,7 +69,7 @@ def update_email_draft(
 
 @tool
 def delete_email_draft(
-    user_email: Annotated[str, InjectedState("user_email")], 
+    user_email: Annotated[str, InjectedState("user_email")],
     email_id: str
 ):
     """Deletes a draft email by ID."""

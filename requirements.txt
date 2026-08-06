@@ -12,13 +12,11 @@ msal
 supabase
 postgrest
 
-# LLM & Agent Framework (LangGraph / OpenAI)
-openai
+# LLM & Agent Framework (LangGraph / Groq)
 langchain
 langgraph
-langchain-openai
-langchain-core
 langchain-groq
+langchain-core
 
 # Authentication & Security
 python-jose[cryptography]
