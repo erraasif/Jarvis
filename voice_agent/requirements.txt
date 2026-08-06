@@ -1,8 +1,8 @@
 livekit
 livekit-agents
-deepgram-sdk
-elevenlabs
+livekit-plugins-deepgram
+livekit-plugins-elevenlabs
 langchain-groq
 langchain-core
-pytz
 python-dotenv
+pytz

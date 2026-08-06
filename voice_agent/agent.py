@@ -3,6 +3,8 @@ import asyncio
 import json
 import sys
 from pathlib import Path
+from datetime import datetime
+import pytz
 
 # Add parent directory to import app
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -10,9 +12,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from livekit import agents
 from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli
 from livekit.agents.voice import Agent
-from livekit.agents.stt import DeepgramSTT
-from livekit.agents.tts import ElevenLabsTTS
 from livekit.agents import VAD
+from livekit.plugins import deepgram, elevenlabs
+
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
 import os
@@ -45,15 +47,40 @@ TOOLS_MAP = {
 
 llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0, api_key=os.getenv("GROQ_API_KEY"))
 
+def get_dynamic_system_prompt(user_email: str, user_timezone: str = "UTC") -> str:
+    try:
+        tz = pytz.timezone(user_timezone)
+    except Exception:
+        tz = pytz.UTC
+    now = datetime.now(tz)
+    return f"""You are JARVIS, an autonomous personal executive AI assistant.
+Your core operating mandate is IMMEDIATE, UNINTERRUPTED EXECUTION.
+
+AUTHENTICATED CONTEXT:
+- Active User Email: '{user_email}'
+- User Timezone: {user_timezone}
+- Current Date: {now.strftime('%A, %B %d, %Y')}
+- Current Time: {now.strftime('%I:%M %p')}
+- ISO Timestamp Baseline: {now.isoformat()}
+
+CORE RULES:
+1. ALWAYS pass user_email='{user_email}' when calling any M365 tools.
+2. IMMEDIATE EXECUTION - NEVER ask for confirmation.
+3. HARD CONSTRAINT: NEVER send emails directly - only create drafts.
+4. Use current date/time for relative references.
+5. After executing a tool, reply with a clear summary.
+"""
+
 class JarvisVoiceAgent(Agent):
     def __init__(self, ctx: JobContext):
         super().__init__(
             ctx=ctx,
-            stt=DeepgramSTT(api_key=os.getenv("DEEPGRAM_API_KEY")),
-            tts=ElevenLabsTTS(api_key=os.getenv("ELEVENLABS_API_KEY")),
+            stt=deepgram.STT(api_key=os.getenv("DEEPGRAM_API_KEY")),
+            tts=elevenlabs.TTS(api_key=os.getenv("ELEVENLABS_API_KEY")),
             vad=VAD.DEFAULT,
         )
         self.user_email = None
+        self.user_timezone = "UTC"
         self.messages = []
 
     async def on_enter(self):
@@ -62,6 +89,7 @@ class JarvisVoiceAgent(Agent):
             try:
                 metadata = json.loads(participant.metadata)
                 self.user_email = metadata.get("email")
+                self.user_timezone = metadata.get("timezone", "UTC")
             except:
                 pass
 
@@ -69,7 +97,8 @@ class JarvisVoiceAgent(Agent):
             await self.say("Please sign in.")
             return
 
-        self.messages = [SystemMessage(content=f"You are Jarvis. User: {self.user_email}")]
+        system_content = get_dynamic_system_prompt(self.user_email, self.user_timezone)
+        self.messages = [SystemMessage(content=system_content)]
         await self.say("Jarvis ready!")
 
     async def on_user_utterance(self, utterance: agents.Utterance):
