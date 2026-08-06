@@ -1,4 +1,4 @@
-# voice_agent/agent.py
+# voice_agent/agent.py - SIMPLE VERSION
 import asyncio
 import json
 import sys
@@ -8,9 +8,7 @@ import pytz
 import os
 
 # Add parent directory to Python path
-parent_dir = str(Path(__file__).parent.parent)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import tools from app
 from app.agent.tools.calendar_tools import (
@@ -23,12 +21,17 @@ from app.agent.tools.todo_tools import (
     get_todos, create_todo, update_todo, delete_todo
 )
 
-# LiveKit imports
+# LiveKit imports - SIMPLE
 from livekit import agents
 from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli
 from livekit.agents.voice import Agent
+
+# Import STT and TTS directly
+from livekit.agents.stt import STT
+from livekit.agents.tts import TTS
+
+# Import VAD
 from livekit.agents import vad
-from livekit.agents import deepgram, elevenlabs
 
 # LangChain imports
 from langchain_groq import ChatGroq
@@ -93,10 +96,11 @@ CORE RULES:
 # ============================================
 class JarvisVoiceAgent(Agent):
     def __init__(self, ctx: JobContext):
+        # Use basic STT/TTS - no plugins
         super().__init__(
             ctx=ctx,
-            stt=deepgram.STT(api_key=os.getenv("DEEPGRAM_API_KEY")),
-            tts=elevenlabs.TTS(api_key=os.getenv("ELEVENLABS_API_KEY")),
+            stt=STT(),  # Basic STT
+            tts=TTS(),  # Basic TTS
             vad=vad.DEFAULT,
         )
         self.user_email = None
