@@ -5,21 +5,14 @@ import sys
 from pathlib import Path
 from datetime import datetime
 import pytz
-
-# Add parent directory to import app
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from livekit import agents
-from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli
-from livekit.agents.voice import Agent
-from livekit.agents import VAD
-from livekit.plugins import deepgram, elevenlabs
-
-from langchain_groq import ChatGroq
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
 import os
 
-# Import tools
+# Add parent directory to Python path
+parent_dir = str(Path(__file__).parent.parent)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+# Import tools from app
 from app.agent.tools.calendar_tools import (
     get_calendar_events, create_calendar_event, update_calendar_event, delete_calendar_event
 )
@@ -30,6 +23,20 @@ from app.agent.tools.todo_tools import (
     get_todos, create_todo, update_todo, delete_todo
 )
 
+# LiveKit imports
+from livekit import agents
+from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli
+from livekit.agents.voice import Agent
+from livekit.agents import vad
+from livekit.agents import deepgram, elevenlabs
+
+# LangChain imports
+from langchain_groq import ChatGroq
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
+
+# ============================================
+# TOOLS MAP
+# ============================================
 TOOLS_MAP = {
     "get_calendar_events": get_calendar_events,
     "create_calendar_event": create_calendar_event,
@@ -45,8 +52,18 @@ TOOLS_MAP = {
     "delete_todo": delete_todo,
 }
 
-llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0, api_key=os.getenv("GROQ_API_KEY"))
+# ============================================
+# LLM SETUP
+# ============================================
+llm = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    temperature=0,
+    api_key=os.getenv("GROQ_API_KEY")
+)
 
+# ============================================
+# SYSTEM PROMPT
+# ============================================
 def get_dynamic_system_prompt(user_email: str, user_timezone: str = "UTC") -> str:
     try:
         tz = pytz.timezone(user_timezone)
@@ -71,13 +88,16 @@ CORE RULES:
 5. After executing a tool, reply with a clear summary.
 """
 
+# ============================================
+# AGENT CLASS
+# ============================================
 class JarvisVoiceAgent(Agent):
     def __init__(self, ctx: JobContext):
         super().__init__(
             ctx=ctx,
             stt=deepgram.STT(api_key=os.getenv("DEEPGRAM_API_KEY")),
             tts=elevenlabs.TTS(api_key=os.getenv("ELEVENLABS_API_KEY")),
-            vad=VAD.DEFAULT,
+            vad=vad.DEFAULT,
         )
         self.user_email = None
         self.user_timezone = "UTC"
@@ -110,7 +130,9 @@ class JarvisVoiceAgent(Agent):
 
         while True:
             llm_with_tools = llm.bind_tools(list(TOOLS_MAP.values()))
-            response = await asyncio.get_running_loop().run_in_executor(None, llm_with_tools.invoke, self.messages)
+            response = await asyncio.get_running_loop().run_in_executor(
+                None, llm_with_tools.invoke, self.messages
+            )
             self.messages.append(response)
 
             if not response.tool_calls:
@@ -135,8 +157,13 @@ class JarvisVoiceAgent(Agent):
                 else:
                     result = f"Tool {tool_name} not found"
 
-                self.messages.append(ToolMessage(content=result, tool_call_id=tool_call["id"]))
+                self.messages.append(
+                    ToolMessage(content=result, tool_call_id=tool_call["id"])
+                )
 
+# ============================================
+# ENTRYPOINT
+# ============================================
 async def entrypoint(ctx: JobContext):
     await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
     agent = JarvisVoiceAgent(ctx)
