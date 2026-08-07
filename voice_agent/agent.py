@@ -37,7 +37,7 @@ from livekit.agents import (
     cli,
     function_tool,
 )
-from livekit.plugins import deepgram, elevenlabs, silero, groq
+from livekit.plugins import deepgram, elevenlabs, silero, groq as lk_groq
 
 from app.agent.tools.calendar_tools import (
     get_calendar_events,
@@ -279,7 +279,7 @@ def build_tools(user_email: str):
 
 
 def _groq_llm():
-    return groq.LLM(
+    return lk_openai.LLM.with_groq(
         model="llama-3.3-70b-versatile",
         api_key=os.getenv("GROQ_API_KEY"),
     )
@@ -291,6 +291,7 @@ async def entrypoint(ctx: JobContext):
     # Wait for the authenticated participant and read the email/timezone
     # the backend embedded in their token metadata (see app/api/voice.py).
     participant = await ctx.wait_for_participant()
+    logger.info("participant joined: identity=%s metadata=%r", participant.identity, participant.metadata)
     user_email = None
     user_timezone = "UTC"
     if participant.metadata:
@@ -300,6 +301,7 @@ async def entrypoint(ctx: JobContext):
             user_timezone = metadata.get("timezone", "UTC")
         except (json.JSONDecodeError, TypeError):
             logger.warning("Could not parse participant metadata: %r", participant.metadata)
+    logger.info("resolved user_email=%r user_timezone=%r", user_email, user_timezone)
 
     session = AgentSession(
         stt=deepgram.STT(api_key=os.getenv("DEEPGRAM_API_KEY")),

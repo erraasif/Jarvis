@@ -194,6 +194,7 @@ export default function App() {
         await voiceRoomRef.current.disconnect();
         voiceRoomRef.current = null;
       }
+      document.querySelectorAll('audio[data-livekit-audio]').forEach((el) => el.remove());
       setVoiceConnected(false);
       setIsSpeaking(false);
       return;
@@ -238,6 +239,7 @@ export default function App() {
       room.on('disconnected', () => {
         setVoiceConnected(false);
         setIsSpeaking(false);
+        document.querySelectorAll('audio[data-livekit-audio]').forEach((el) => el.remove());
         console.log('🎤 Voice disconnected');
       });
 
@@ -256,6 +258,16 @@ export default function App() {
       room.on('trackSubscribed', (track) => {
         if (track.kind === 'audio') {
           console.log('🔊 Audio track received');
+          const audioEl = track.attach();
+          audioEl.dataset.livekitAudio = 'true';
+          audioEl.autoplay = true;
+          document.body.appendChild(audioEl);
+        }
+      });
+
+      room.on('trackUnsubscribed', (track) => {
+        if (track.kind === 'audio') {
+          track.detach().forEach((el) => el.remove());
         }
       });
 
