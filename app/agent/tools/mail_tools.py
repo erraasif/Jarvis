@@ -4,7 +4,7 @@ Mail Tools Module for JARVIS Agent
 Contains LangChain tool definitions for inspecting and managing Outlook emails.
 """
 
-from typing import Annotated
+from typing import Annotated, Union
 from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedState
 from app.services.graph_client import graph_request
@@ -13,17 +13,16 @@ from app.services.graph_client import graph_request
 @tool
 def get_emails(
     user_email: Annotated[str, InjectedState("user_email")],
-    top: int = 5
+    top: Union[int, str] = 5
 ):
     """
     Fetches recent emails for the user.
     'top' indicates the number of emails to retrieve (must be an integer, e.g. 5 or 10).
     """
-    if isinstance(top, str):
-        try:
-            top = int(top)
-        except ValueError:
-            top = 5
+    try:
+        top = int(top)
+    except (ValueError, TypeError):
+        top = 5
 
     return graph_request(
         user_email,

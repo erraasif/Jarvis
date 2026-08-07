@@ -14,6 +14,8 @@ import {
   Zap,
   Globe,
   Bot,
+  Volume2,
+  Radio,
 } from "lucide-react";
 import Logo from "./Logo";
 import { ThemeToggle } from "./ThemeToggle";
@@ -186,16 +188,22 @@ function Interactive3DCore({ isDark }) {
           <CheckSquare className="w-4 h-4 md:w-5 md:h-5 text-emerald-400" />
         </motion.div>
 
-        {/* Voice Badge - New */}
-        <motion.div
-          animate={{ scale: [1, 1.05, 1] }}
-          transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+        {/* Listening indicator - live waveform, not a static label */}
+        <div
           style={{ transform: "translateZ(60px)" }}
-          className="absolute bottom-0 right-0 z-20 px-3 py-1.5 rounded-full bg-accent/20 backdrop-blur-xl border border-accent/40 text-[10px] font-mono font-bold text-accent flex items-center gap-1.5"
+          className="absolute bottom-0 right-0 z-20 flex items-center gap-2 pl-2 pr-3 py-2 rounded-full bg-surface/85 backdrop-blur-xl border border-accent/40 shadow-lg"
         >
-          <Mic size={10} className="animate-pulse" />
-          <span>Voice Ready</span>
-        </motion.div>
+          <Mic size={11} className="text-accent" />
+          <span className="flex items-end gap-[2px] h-3" aria-hidden="true">
+            {[0, 1, 2, 3].map((i) => (
+              <span
+                key={i}
+                className="waveform-bar w-[2.5px] rounded-full bg-accent"
+                style={{ "--bar-delay": `${i * 0.12}s` }}
+              />
+            ))}
+          </span>
+        </div>
       </motion.div>
     </div>
   );
@@ -253,9 +261,96 @@ function FeatureCard({ icon: Icon, label, title, body, index, color }) {
   );
 }
 
+const PIPELINE_STAGES = [
+  { icon: Mic, label: "Voice In" },
+  { icon: Radio, label: "Transcribe" },
+  { icon: Cpu, label: "Reason" },
+  { icon: Volume2, label: "Voice Out" },
+];
+
+function PipelineTelemetry() {
+  const [latency, setLatency] = useState(612);
+  const [activeStage, setActiveStage] = useState(0);
+
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReducedMotion) return;
+
+    let stage = 0;
+    const interval = setInterval(() => {
+      stage = (stage + 1) % PIPELINE_STAGES.length;
+      setActiveStage(stage);
+      if (stage === 0) {
+        setLatency(420 + Math.floor(Math.random() * 340));
+      }
+    }, 650);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="w-full max-w-md mt-7 p-3.5 rounded-2xl border border-border/70 bg-surface/70 backdrop-blur-xl font-mono shadow-lg">
+      <div className="flex items-center justify-between px-1 mb-3">
+        <span className="text-[10px] uppercase tracking-widest text-ink-muted">Live Voice Pipeline</span>
+        <span className="flex items-center gap-1.5 text-[10px]">
+          <span className={`w-1.5 h-1.5 rounded-full ${latency < 800 ? "bg-emerald-400" : "bg-amber-400"}`} />
+          <span className={latency < 800 ? "text-emerald-400" : "text-amber-400"}>{latency}ms</span>
+          <span className="text-ink-muted/70">/ 800ms target</span>
+        </span>
+      </div>
+      <div className="relative flex items-center justify-between px-1">
+        <div className="absolute left-4 right-4 top-1/2 -translate-y-1/2 h-px bg-border/80" />
+        {PIPELINE_STAGES.map((stage, i) => {
+          const Icon = stage.icon;
+          const isActive = i === activeStage;
+          return (
+            <div key={stage.label} className="relative z-10 flex flex-col items-center gap-1.5 bg-surface/70 px-1.5">
+              <div
+                className={`w-7 h-7 rounded-full flex items-center justify-center border transition-all duration-300 ${
+                  isActive
+                    ? "bg-accent text-accent-ink border-accent shadow-[0_0_16px_var(--color-accent)]"
+                    : "bg-surface-2 text-ink-muted border-border"
+                }`}
+              >
+                <Icon size={13} />
+              </div>
+              <span className={`text-[9px] tracking-wide ${isActive ? "text-accent" : "text-ink-muted"}`}>
+                {stage.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function useReveal() {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.2 }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  return [ref, visible];
+}
+
 export default function LandingPage({ onLogin, isDark, setIsDark }) {
   const [activeTab, setActiveTab] = useState("mail");
   const [isVoiceSupported, setIsVoiceSupported] = useState(true);
+  const [terminalRef, terminalVisible] = useReveal();
 
   useEffect(() => {
     // Check if browser supports WebRTC
@@ -296,6 +391,7 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
       <div className="fixed inset-0 pointer-events-none -z-10">
         <div className="absolute top-[-40%] left-[-20%] w-[600px] h-[600px] rounded-full bg-accent/10 blur-[120px]" />
         <div className="absolute bottom-[-40%] right-[-20%] w-[600px] h-[600px] rounded-full bg-[color:var(--color-glow-2)]/10 blur-[120px]" />
+        <div className="console-grid absolute inset-0" />
       </div>
 
       {/* Header */}
@@ -364,6 +460,15 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
           Outlook Mail, Calendar, and To-Do with complete precision — now with <span className="text-accent font-semibold">voice</span>.
         </motion.p>
 
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35 }}
+          className="flex justify-center w-full"
+        >
+          <PipelineTelemetry />
+        </motion.div>
+
         {/* Sign-in Button */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -410,7 +515,7 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
         </div>
 
         {/* Terminal Playground */}
-        <div className="relative mt-16 w-full">
+        <div ref={terminalRef} className={`reveal-up ${terminalVisible ? "is-visible" : ""} relative mt-16 w-full`}>
           <div className="absolute -top-12 left-1/4 w-[400px] h-[250px] bg-accent/25 blur-[100px] rounded-full pointer-events-none -z-10" />
           <div className="absolute -bottom-10 right-1/4 w-[400px] h-[250px] bg-[color:var(--color-glow-2)]/20 blur-[110px] rounded-full pointer-events-none -z-10" />
 

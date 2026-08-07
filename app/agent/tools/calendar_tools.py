@@ -5,14 +5,14 @@ Provides autonomous CRUD operations for Microsoft Graph Calendar API.
 Designed for immediate execution without unnecessary user confirmation loops.
 """
 
-from typing import Optional
+from typing import Optional, Union
 import datetime
 from langchain_core.tools import tool
 from app.services.graph_client import graph_request
 
 
 @tool
-def get_calendar_events(user_email: str, top: int = 10):
+def get_calendar_events(user_email: str, top: Union[int, str] = 10):
     """
     Retrieves upcoming calendar events for the user.
     
@@ -20,6 +20,10 @@ def get_calendar_events(user_email: str, top: int = 10):
         user_email: User's primary email address.
         top: Number of events to retrieve (default 10).
     """
+    try:
+        top = int(top)
+    except (ValueError, TypeError):
+        top = 10
     user_email = user_email.strip().lower()
     endpoint = f"/me/events?$top={top}&$select=id,subject,start,end,location,bodyPreview&$orderby=start/dateTime ASC"
     return graph_request(user_email, "GET", endpoint)

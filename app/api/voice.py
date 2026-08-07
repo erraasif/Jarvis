@@ -1,4 +1,5 @@
 # app/api/voice.py
+import hashlib
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import os
@@ -16,6 +17,10 @@ class TokenRequest(BaseModel):
 async def get_voice_token(request: TokenRequest):
     """Generate LiveKit token for frontend to connect"""
     try:
+        # Each user gets their own room. A single shared "jarvis-room" would put
+        # every concurrent user's voice session in the same call together.
+        room_name = "jarvis-" + hashlib.sha256(request.user_email.strip().lower().encode()).hexdigest()[:16]
+
         # Simple JWT token generation (no livekit.api needed)
         token = jwt.encode(
             {
@@ -24,7 +29,7 @@ async def get_voice_token(request: TokenRequest):
                 "nbf": int(time.time()) - 10,
                 "sub": request.user_email,
                 "video": {
-                    "room": "jarvis-room",
+                    "room": room_name,
                     "roomJoin": True,
                     "canPublish": True,
                     "canSubscribe": True
@@ -37,6 +42,6 @@ async def get_voice_token(request: TokenRequest):
             os.getenv("LIVEKIT_API_SECRET", "secret"),
             algorithm="HS256"
         )
-        return {"token": token}
+        return {"token": token, "room": room_name}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

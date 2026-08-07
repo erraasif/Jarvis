@@ -589,7 +589,7 @@ export default function App() {
   const unpinnedSessions = sessions.filter((s) => !s.isPinned);
 
   const DataCard = ({ title, subtitle, children, icon: Icon, action }) => (
-    <div className="bg-surface/80 backdrop-blur-xl border border-border rounded-3xl p-6 md:p-8 shadow-xl transition-all duration-300 card-3d depth-layer-1">
+    <div className="bg-surface/80 backdrop-blur-xl border border-border rounded-3xl p-6 md:p-8 shadow-xl transition-all duration-300">
       <div className="flex items-center justify-between gap-3.5 mb-6 pb-5 border-b border-border/80">
         <div className="flex items-center gap-3.5">
           <div className="p-3 bg-surface-2 border border-border rounded-2xl text-accent shadow-inner">
@@ -624,7 +624,7 @@ export default function App() {
         <aside
           className={`${
             sidebarOpen ? "w-64 md:w-72" : "w-16"
-          } bg-surface/80 backdrop-blur-2xl border-r border-border/70 p-3.5 flex flex-col justify-between relative z-20 shrink-0 transition-all duration-300 ease-in-out card-3d depth-layer-2 holo-glow`}
+          } bg-surface/80 backdrop-blur-2xl border-r border-border/70 p-3.5 flex flex-col justify-between relative z-20 shrink-0 transition-all duration-300 ease-in-out`}
         >
           <div className="flex flex-col h-full overflow-hidden">
             {/* Top Bar */}
@@ -777,7 +777,7 @@ export default function App() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 flex flex-col h-full bg-bg relative overflow-hidden depth-layer-1">
+        <main className="flex-1 flex flex-col h-full bg-bg relative overflow-hidden">
           {activeTab === "chat" && (
             <div className="flex-1 flex flex-col h-full relative overflow-hidden">
               {/* Header */}
@@ -853,7 +853,7 @@ export default function App() {
                         <div className={`px-4 py-3.5 rounded-2xl shadow-sm min-w-0 ${
                           msg.sender === "user"
                             ? "bg-accent text-accent-ink font-medium text-sm leading-relaxed"
-                            : "bg-surface text-ink border border-border/80 w-full card-3d depth-layer-1"
+                            : "bg-surface text-ink border border-border/80 w-full"
                         }`}>
                           {isStreamingPlaceholder ? (
                             <span className="flex items-center gap-2 text-xs font-mono text-ink-muted">
@@ -924,7 +924,7 @@ export default function App() {
                   ) : (
                     <div className="space-y-2.5">
                       {emails.map((m) => (
-                        <div key={m.id} className="p-3.5 bg-surface-2/40 border border-border/50 rounded-2xl flex items-center justify-between gap-3 card-3d depth-layer-1">
+                        <div key={m.id} className="p-3.5 bg-surface-2/40 border border-border/50 rounded-2xl flex items-center justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="font-semibold text-xs text-ink truncate">{m.sender?.emailAddress?.name || m.sender?.emailAddress?.address || "Unknown"}</span>
@@ -984,7 +984,7 @@ export default function App() {
                   }
                 >
                   {showEventForm && (
-                    <form onSubmit={submitEvent} className="mb-6 p-4 bg-surface-2/80 border border-border rounded-2xl space-y-3 card-3d depth-layer-1">
+                    <form onSubmit={submitEvent} className="mb-6 p-4 bg-surface-2/80 border border-border rounded-2xl space-y-3">
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-ink-muted">
                           {editingEventId ? "Edit Event" : "New Event"}
@@ -1045,7 +1045,7 @@ export default function App() {
                   ) : (
                     <div className="space-y-2.5">
                       {events.map((evt) => (
-                        <div key={evt.id} className="p-3.5 bg-surface-2/40 border border-border/50 rounded-2xl flex items-center justify-between gap-3 card-3d depth-layer-1">
+                        <div key={evt.id} className="p-3.5 bg-surface-2/40 border border-border/50 rounded-2xl flex items-center justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <h4 className="font-semibold text-xs text-ink truncate">{evt.subject}</h4>
                             <p className="text-[11px] text-ink-muted mt-0.5 font-mono">
@@ -1093,7 +1093,7 @@ export default function App() {
                   ) : (
                     <div className="space-y-2">
                       {todos.map((task) => (
-                        <div key={task.id} className="p-3 bg-surface-2/40 border border-border/50 rounded-xl flex items-center justify-between gap-3 card-3d depth-layer-1">
+                        <div key={task.id} className="p-3 bg-surface-2/40 border border-border/50 rounded-xl flex items-center justify-between gap-3">
                           <div className="flex items-center gap-2.5 min-w-0 flex-1">
                             <button
                               onClick={() => toggleTodo(task)}

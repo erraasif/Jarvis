@@ -32,37 +32,7 @@
     </script>
   </head>
   <body>
-    <!-- 3D Particle Background -->
-    <div class="particle-container" id="particles"></div>
-    
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-    
-    <!-- Particle Generator Script -->
-    <script>
-      (function() {
-        const container = document.getElementById('particles');
-        if (!container) return;
-        
-        const colors = ['#5B3DF5', '#8B7CFF', '#22D3EE', '#0EA5E9', '#A78BFA'];
-        const count = 40;
-        
-        for (let i = 0; i < count; i++) {
-          const particle = document.createElement('div');
-          particle.className = 'particle';
-          particle.style.setProperty('--duration', (12 + Math.random() * 20) + 's');
-          particle.style.setProperty('--delay', (Math.random() * 12) + 's');
-          particle.style.setProperty('--drift', (Math.random() - 0.5) * 300 + 'px');
-          particle.style.left = (Math.random() * 100) + '%';
-          const size = 2 + Math.random() * 5;
-          particle.style.width = size + 'px';
-          particle.style.height = size + 'px';
-          particle.style.background = colors[Math.floor(Math.random() * colors.length)];
-          particle.style.opacity = 0.15 + Math.random() * 0.5;
-          particle.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
-          container.appendChild(particle);
-        }
-      })();
-    </script>
   </body>
 </html>
