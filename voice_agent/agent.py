@@ -37,7 +37,7 @@ from livekit.agents import (
     cli,
     function_tool,
 )
-from livekit.plugins import deepgram, elevenlabs, silero, openai as lk_openai
+from livekit.plugins import deepgram, elevenlabs, silero, groq
 
 from app.agent.tools.calendar_tools import (
     get_calendar_events,
@@ -279,7 +279,7 @@ def build_tools(user_email: str):
 
 
 def _groq_llm():
-    return lk_openai.LLM.with_groq(
+    return groq.LLM(
         model="llama-3.3-70b-versatile",
         api_key=os.getenv("GROQ_API_KEY"),
     )
