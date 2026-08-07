@@ -2,7 +2,13 @@ livekit
 livekit-agents
 livekit-plugins-deepgram
 livekit-plugins-elevenlabs
-langchain-groq
+livekit-plugins-silero
+livekit-plugins-openai
 langchain-core
+langgraph
 python-dotenv
 pytz
+msal
+httpx
+supabase
+cryptography
