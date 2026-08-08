@@ -1,27 +1,42 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Track } from "livekit-client";
-import { Mail, Calendar, CheckSquare, X, Mic, Volume2 } from "lucide-react";
+import { Mail, Calendar, CheckSquare, X, ChevronDown, Mic, MicOff, Volume2 } from "lucide-react";
+import JarvisMascot from "./JarvisMascot";
 
 /**
  * Full-screen voice presence. Mounted only while voiceConnected is true.
  *
- * The orb's motion is driven by real audio levels (Web Audio AnalyserNode)
- * read from the actual mic input and the actual agent output track --
- * not a decorative CSS loop. If audio isn't flowing, the orb sits still,
- * which is honest and also doubles as a visual diagnostic.
+ * The avatar's glow/pulse is driven by real audio (Web Audio AnalyserNode)
+ * read from the actual mic input and the actual agent output track -- not a
+ * decorative loop. The mic button actually mutes/unmutes the published
+ * track. Quick actions publish a real data message the agent listens for
+ * (see agent.py's data_received handler) so tapping "Mail" genuinely tells
+ * Jarvis what you want, instead of only switching a tab.
  */
-export default function VoiceMode({ voiceRoomRef, isSpeaking, voiceConnecting, onDisconnect, onQuickAction }) {
-  const [micLevel, setMicLevel] = useState(0);
-  const [agentLevel, setAgentLevel] = useState(0);
+export default function VoiceMode({ voiceRoomRef, isSpeaking, voiceConnecting, onDisconnect, onMinimize, onQuickAction }) {
+  const [level, setLevel] = useState(0);
+  const [muted, setMuted] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const audioLevelRef = useRef(0);
   const rafRef = useRef(null);
   const audioCtxRef = useRef(null);
+  const startRef = useRef(Date.now());
+  const isSpeakingRef = useRef(isSpeaking);
+
+  useEffect(() => {
+    isSpeakingRef.current = isSpeaking;
+  }, [isSpeaking]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     let micAnalyser = null;
     let agentAnalyser = null;
-    const micData = new Uint8Array(64);
-    const agentData = new Uint8Array(64);
+    const freqData = new Uint8Array(64);
 
     const setup = (attemptsLeft) => {
       if (cancelled) return;
@@ -42,8 +57,7 @@ export default function VoiceMode({ voiceRoomRef, isSpeaking, voiceConnecting, o
         const micPublication = room.localParticipant?.getTrackPublication?.(Track.Source.Microphone);
         const micTrack = micPublication?.track?.mediaStreamTrack;
         if (micTrack) {
-          const micStream = new MediaStream([micTrack]);
-          const micSource = audioCtx.createMediaStreamSource(micStream);
+          const micSource = audioCtx.createMediaStreamSource(new MediaStream([micTrack]));
           micAnalyser = audioCtx.createAnalyser();
           micAnalyser.fftSize = 128;
           micSource.connect(micAnalyser);
@@ -65,13 +79,14 @@ export default function VoiceMode({ voiceRoomRef, isSpeaking, voiceConnecting, o
 
       const tick = () => {
         if (cancelled) return;
-        if (micAnalyser) {
-          micAnalyser.getByteFrequencyData(micData);
-          setMicLevel(micData.reduce((a, b) => a + b, 0) / micData.length / 255);
-        }
-        if (agentAnalyser) {
-          agentAnalyser.getByteFrequencyData(agentData);
-          setAgentLevel(agentData.reduce((a, b) => a + b, 0) / agentData.length / 255);
+        const activeAnalyser = isSpeakingRef.current ? agentAnalyser || micAnalyser : micAnalyser || agentAnalyser;
+        if (activeAnalyser) {
+          activeAnalyser.getByteFrequencyData(freqData);
+          let sum = 0;
+          for (let i = 0; i < freqData.length; i++) sum += freqData[i] / 255;
+          const avg = sum / freqData.length;
+          audioLevelRef.current = avg;
+          setLevel(avg);
         }
         rafRef.current = requestAnimationFrame(tick);
       };
@@ -87,15 +102,36 @@ export default function VoiceMode({ voiceRoomRef, isSpeaking, voiceConnecting, o
     };
   }, [voiceRoomRef]);
 
-  const level = isSpeaking ? agentLevel : micLevel;
-  const orbScale = 1 + Math.min(level, 1) * 0.35;
-  const orbGlow = 20 + Math.min(level, 1) * 60;
+  const toggleMute = async () => {
+    const room = voiceRoomRef?.current;
+    if (!room?.localParticipant) return;
+    try {
+      await room.localParticipant.setMicrophoneEnabled(muted);
+      setMuted((m) => !m);
+    } catch (e) {
+      console.error("Voice Mode: failed to toggle mic", e);
+    }
+  };
 
-  const statusText = voiceConnecting
-    ? "Connecting..."
-    : isSpeaking
-    ? "Jarvis is speaking"
-    : "Listening";
+  const sendQuickAction = (id, label) => {
+    const room = voiceRoomRef?.current;
+    if (room?.localParticipant) {
+      try {
+        const payload = new TextEncoder().encode(
+          JSON.stringify({ type: "quick_action", action: id, label })
+        );
+        room.localParticipant.publishData(payload, { reliable: true, topic: "quick_action" });
+      } catch (e) {
+        console.warn("Voice Mode: could not send quick action to agent", e);
+      }
+    }
+    onQuickAction(id);
+  };
+
+  const statusText = voiceConnecting ? "CONNECTING" : muted ? "MUTED" : isSpeaking ? "JARVIS SPEAKING" : "LISTENING";
+  const statusColor = voiceConnecting ? "text-amber-400" : muted ? "text-ink-muted" : isSpeaking ? "text-accent" : "text-emerald-400";
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
+  const ss = String(elapsed % 60).padStart(2, "0");
 
   const quickActions = [
     { id: "emails", label: "Mail", icon: Mail },
@@ -104,54 +140,70 @@ export default function VoiceMode({ voiceRoomRef, isSpeaking, voiceConnecting, o
   ];
 
   return (
-    <div className="fixed inset-0 z-100 bg-bg/97 backdrop-blur-2xl flex flex-col items-center justify-center gap-10 px-6">
-      <button
-        onClick={onDisconnect}
-        className="absolute top-6 right-6 p-3 rounded-full bg-surface/80 border border-border hover:bg-surface-2 transition-colors text-ink-muted hover:text-ink"
-        aria-label="Exit voice mode"
-      >
-        <X size={20} />
-      </button>
+    <div className="fixed inset-0 z-[100] bg-bg/98 backdrop-blur-2xl flex flex-col items-center justify-center gap-8 px-6 font-mono">
+      <div className="console-grid absolute inset-0 pointer-events-none opacity-50" />
 
-      <div className="console-grid absolute inset-0 pointer-events-none opacity-60" />
-
-      {/* Reactive orb */}
-      <div className="relative flex items-center justify-center" style={{ width: 260, height: 260 }}>
-        <div
-          className="absolute rounded-full transition-transform duration-100 ease-out"
-          style={{
-            width: 220,
-            height: 220,
-            transform: `scale(${orbScale})`,
-            background:
-              "radial-gradient(circle at 35% 30%, var(--color-glow-2), var(--color-accent) 55%, transparent 78%)",
-            boxShadow: `0 0 ${orbGlow}px color-mix(in srgb, var(--color-accent) 55%, transparent)`,
-            opacity: 0.9,
-          }}
-        />
-        <div
-          className="absolute rounded-full border border-accent/40"
-          style={{ width: 260, height: 260, transform: `scale(${1 + Math.min(level, 1) * 0.15})` }}
-        />
-        <div className="relative z-10 text-bg">
-          {isSpeaking ? <Volume2 size={28} /> : <Mic size={28} />}
+      {/* Top bar */}
+      <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-6 py-5 border-b border-border/60">
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest">
+          <span className={`w-1.5 h-1.5 rounded-full ${statusColor.replace("text-", "bg-")}`} />
+          <span className={statusColor}>{statusText}</span>
+          <span className="text-ink-muted/60">· {mm}:{ss}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onMinimize}
+            className="flex items-center gap-1.5 px-3 py-2 border border-border/70 bg-surface/70 hover:bg-surface-2 transition-colors text-[11px] uppercase tracking-wide text-ink-muted hover:text-ink"
+          >
+            <ChevronDown size={13} />
+            Back to chat
+          </button>
+          <button
+            onClick={onDisconnect}
+            className="flex items-center gap-1.5 px-3 py-2 border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 transition-colors text-[11px] uppercase tracking-wide text-red-400"
+            aria-label="End voice session"
+          >
+            <X size={13} />
+            End
+          </button>
         </div>
       </div>
 
-      <div className="flex flex-col items-center gap-2 font-mono">
-        <span className="text-sm tracking-widest uppercase text-ink-muted">{statusText}</span>
+      {/* 3D avatar, driven by real audio level */}
+      <div className="relative w-full max-w-[280px] aspect-square">
+        <JarvisMascot className="absolute inset-0 h-full w-full" audioLevelRef={audioLevelRef} />
       </div>
 
+      {/* Tap-to-mute mic -- a real toggle on the actual published track */}
+      <button
+        onClick={toggleMute}
+        className={`relative flex items-center justify-center w-16 h-16 rounded-full border transition-all duration-200 ${
+          muted
+            ? "border-red-500/40 bg-red-500/10 text-red-400"
+            : "border-accent/50 bg-accent/10 text-accent mic-pulse"
+        }`}
+        style={{ "--mic-level": level }}
+        aria-label={muted ? "Unmute microphone" : "Mute microphone"}
+      >
+        {muted ? <MicOff size={22} /> : <Mic size={22} />}
+      </button>
+
+      <div className="flex items-center gap-2 text-ink-muted text-xs">
+        {isSpeaking ? <Volume2 size={13} /> : <Mic size={13} />}
+        <span>{isSpeaking ? "output" : "input"} level {Math.round(level * 100)}%</span>
+      </div>
+
+      {/* Quick actions -- these publish a real message the agent listens for */}
       <div className="flex gap-3">
         {quickActions.map((action) => {
           const Icon = action.icon;
           return (
             <button
               key={action.id}
-              onClick={() => onQuickAction(action.id)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface/80 border border-border hover:border-accent/50 hover:bg-surface-2 transition-colors text-sm text-ink"
+              onClick={() => sendQuickAction(action.id, action.label)}
+              className="flex items-center gap-2 px-4 py-2.5 border border-border/70 bg-surface/70 hover:border-accent/50 hover:bg-surface-2 transition-colors text-xs uppercase tracking-wide text-ink"
             >
-              <Icon size={15} />
+              <Icon size={14} />
               {action.label}
             </button>
           );

@@ -192,3 +192,43 @@ body::before {
 @media (prefers-reduced-motion: reduce) {
   .voice-preview-pulse { animation: none; }
 }
+
+/* ==========================================================================
+   PULSE GLOW — sign-in CTA and capability cards
+   ========================================================================== */
+
+@keyframes btn-pulse-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--color-accent) 60%, transparent),
+      0 8px 30px color-mix(in srgb, var(--color-accent) 40%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px var(--color-accent),
+      0 10px 46px color-mix(in srgb, var(--color-accent) 70%, transparent);
+  }
+}
+.btn-pulse-glow {
+  animation: btn-pulse-glow 2.8s ease-in-out infinite;
+}
+
+@keyframes card-pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 0%, transparent); }
+  50% { box-shadow: 0 0 24px -4px color-mix(in srgb, var(--color-accent) 35%, transparent); }
+}
+.card-pulse-glow {
+  animation: card-pulse-glow 4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-pulse-glow, .card-pulse-glow { animation: none; }
+}
+
+/* ==========================================================================
+   VOICE MODE — mic button glow driven by --mic-level (set from real audio)
+   ========================================================================== */
+.mic-pulse {
+  box-shadow: 0 0 calc(10px + var(--mic-level, 0) * 40px) color-mix(in srgb, var(--color-accent) calc(40% + var(--mic-level, 0) * 40%), transparent);
+  transition: box-shadow 0.08s linear;
+}

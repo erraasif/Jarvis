@@ -14,6 +14,7 @@ used by the text agent (app/agent/tools/*) -- we call their underlying
 `.func` directly rather than going through LangChain's tool-calling layer,
 and expose them to LiveKit via @function_tool wrappers instead.
 """
+import asyncio
 import json
 import logging
 import os
@@ -325,6 +326,28 @@ async def entrypoint(ctx: JobContext):
     session.on("agent_state_changed", lambda ev: logger.info("agent_state_changed: %s", ev.new_state))
     session.on("user_input_transcribed", lambda ev: logger.info("transcribed (final=%s): %r", ev.is_final, ev.transcript))
     session.on("error", lambda ev: logger.error("session error: %s", ev.error))
+
+    QUICK_ACTION_PROMPTS = {
+        "emails": "The user just tapped the Mail quick action in Voice Mode. Check their recent emails and summarize what's there in one or two spoken sentences.",
+        "calendar": "The user just tapped the Calendar quick action in Voice Mode. Check their upcoming events and summarize what's there in one or two spoken sentences.",
+        "todos": "The user just tapped the To-Do quick action in Voice Mode. Check their task list and summarize what's there in one or two spoken sentences.",
+    }
+
+    def _on_data_received(packet):
+        try:
+            payload = json.loads(packet.data.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError, AttributeError):
+            return
+        if payload.get("type") != "quick_action":
+            return
+        action = payload.get("action")
+        instructions = QUICK_ACTION_PROMPTS.get(action)
+        if not instructions:
+            return
+        logger.info("quick_action received: %s", action)
+        asyncio.create_task(session.generate_reply(instructions=instructions))
+
+    ctx.room.on("data_received", _on_data_received)
 
     await session.start(room=ctx.room, agent=agent, room_input_options=RoomInputOptions())
     await session.generate_reply(instructions="Greet the user briefly as Jarvis and ask how you can help.")

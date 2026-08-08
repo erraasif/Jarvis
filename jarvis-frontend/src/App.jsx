@@ -614,10 +614,14 @@ export default function App() {
   const unpinnedSessions = sessions.filter((s) => !s.isPinned);
 
   const DataCard = ({ title, subtitle, children, icon: Icon, action }) => (
-    <div className="bg-surface/80 backdrop-blur-xl border border-border rounded-3xl p-6 md:p-8 shadow-xl transition-all duration-300">
+    <div className="relative bg-surface/80 backdrop-blur-xl border border-border p-6 md:p-8 transition-all duration-300">
+      <span className="hud-bracket tl" />
+      <span className="hud-bracket tr" />
+      <span className="hud-bracket bl" />
+      <span className="hud-bracket br" />
       <div className="flex items-center justify-between gap-3.5 mb-6 pb-5 border-b border-border/80">
         <div className="flex items-center gap-3.5">
-          <div className="p-3 bg-surface-2 border border-border rounded-2xl text-accent shadow-inner">
+          <div className="p-3 bg-surface-2 border border-border text-accent">
             <Icon size={22} />
           </div>
           <div>
@@ -650,6 +654,7 @@ export default function App() {
           isSpeaking={isSpeaking}
           voiceConnecting={voiceConnecting}
           onDisconnect={connectVoice}
+          onMinimize={() => setVoiceModeVisible(false)}
           onQuickAction={(tabId) => {
             setActiveTab(tabId);
             setVoiceModeVisible(false);
@@ -661,7 +666,7 @@ export default function App() {
         <aside
           className={`${
             sidebarOpen ? "w-64 md:w-72" : "w-16"
-          } bg-surface/80 backdrop-blur-2xl border-r border-border/70 p-3.5 flex flex-col justify-between relative z-20 shrink-0 transition-all duration-300 ease-in-out`}
+          } bg-surface/80 backdrop-blur-2xl border-r border-border p-3.5 flex flex-col justify-between relative z-20 shrink-0 transition-all duration-300 ease-in-out`}
         >
           <div className="flex flex-col h-full overflow-hidden">
             {/* Top Bar */}
@@ -692,7 +697,7 @@ export default function App() {
             {/* New Chat Button */}
             <button
               onClick={handleNewChat}
-              className={`w-full mb-4 flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-accent text-accent-ink font-semibold hover:opacity-90 transition-all shadow-md shadow-accent/15 cursor-pointer active:scale-[0.98] shrink-0 ${
+              className={`w-full mb-4 flex items-center justify-center gap-2 py-2.5 bg-accent text-accent-ink font-semibold hover:opacity-90 transition-all cursor-pointer active:scale-[0.98] shrink-0 btn-pulse-glow ${
                 !sidebarOpen ? "px-0" : ""
               }`}
               title="New Chat"
@@ -705,7 +710,7 @@ export default function App() {
               {/* Workspace Apps */}
               <nav className="space-y-1">
                 {sidebarOpen && (
-                  <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted">
+                  <div className="px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-widest text-ink-muted">
                     Workspace
                   </div>
                 )}
@@ -717,10 +722,10 @@ export default function App() {
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
                       title={!sidebarOpen ? tab.label : undefined}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-[0.98] cursor-pointer ${
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-xs font-semibold transition-all active:scale-[0.98] cursor-pointer border-l-2 ${
                         isActive
-                          ? "bg-surface-2 text-ink shadow-sm border border-border/80"
-                          : "text-ink-muted hover:bg-surface-2/60 hover:text-ink"
+                          ? "bg-surface-2 text-ink border-accent"
+                          : "text-ink-muted hover:bg-surface-2/60 hover:text-ink border-transparent"
                       } ${!sidebarOpen ? "justify-center px-0" : ""}`}
                     >
                       <Icon size={18} className={isActive ? "text-accent" : "opacity-75"} />
@@ -819,25 +824,25 @@ export default function App() {
             <div className="flex-1 flex flex-col h-full relative overflow-hidden">
               {/* Header */}
               <div className="px-6 py-3 border-b border-border/60 bg-surface/30 backdrop-blur-md flex items-center justify-between z-10 shrink-0">
-                <div className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
+                <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-ink-muted">
                   <Sparkles size={14} className="text-accent" />
                   <span>Autonomous M365 Copilot</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-500 font-mono bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Connected
+                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-mono uppercase tracking-wider bg-emerald-500/10 px-2.5 py-1 border border-emerald-500/25">
+                    <span className="w-1.5 h-1.5 bg-emerald-400 animate-pulse" /> Connected
                   </div>
                   {/* Voice Button */}
                   <button
                     onClick={connectVoice}
                     disabled={voiceConnecting}
                     className={`
-                      relative flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 cursor-pointer
+                      relative flex items-center gap-2 px-3.5 py-1.5 text-xs font-mono uppercase tracking-wider transition-all duration-300 cursor-pointer border
                       ${voiceConnected 
-                        ? 'bg-red-500/20 text-red-500 border border-red-500/30 hover:bg-red-500/30' 
+                        ? 'bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30' 
                         : voiceConnecting
-                        ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30 animate-pulse cursor-wait'
-                        : 'bg-accent/20 text-accent border border-accent/30 hover:bg-accent/30'
+                        ? 'bg-amber-500/20 text-amber-400 border-amber-500/30 animate-pulse cursor-wait'
+                        : 'bg-accent/20 text-accent border-accent/30 hover:bg-accent/30'
                       }
                     `}
                     title={voiceConnected ? "Disconnect voice" : "Connect voice"}
@@ -913,14 +918,14 @@ export default function App() {
               <div className="absolute bottom-6 left-0 right-0 px-4 max-w-3xl mx-auto w-full z-20">
                 <form
                   onSubmit={handleSendMessage}
-                  className="bg-surface/95 backdrop-blur-2xl border border-border/80 p-2 rounded-full flex items-center gap-2 shadow-2xl focus-within:border-accent transition-all duration-300"
+                  className="bg-surface/95 backdrop-blur-2xl border border-border/80 p-2 flex items-center gap-2 shadow-2xl focus-within:border-accent transition-all duration-300"
                 >
                   <input
                     type="text"
                     value={inputMessage}
                     onChange={(e) => setInputMessage(e.target.value)}
                     placeholder={voiceConnected ? "💬 Type or speak to Jarvis..." : "Ask Jarvis to search emails, add tasks, or plan events..."}
-                    className="flex-1 bg-transparent border-none rounded-full px-4 py-2.5 text-sm text-ink focus:outline-none placeholder:text-ink-muted/70"
+                    className="flex-1 bg-transparent border-none px-4 py-2.5 text-sm text-ink focus:outline-none placeholder:text-ink-muted/70"
                     disabled={loading || !isAuthenticated}
                   />
                   {voiceConnected && (
@@ -935,7 +940,7 @@ export default function App() {
                   )}
                   <button
                     type="submit"
-                    className="bg-accent text-accent-ink w-10 h-10 rounded-full flex items-center justify-center hover:opacity-90 transition disabled:opacity-30 active:scale-95 shrink-0 shadow-md cursor-pointer"
+                    className="bg-accent text-accent-ink w-10 h-10 flex items-center justify-center hover:opacity-90 transition disabled:opacity-30 active:scale-95 shrink-0 cursor-pointer"
                     disabled={loading || !isAuthenticated || !inputMessage.trim()}
                   >
                     <Send size={16} />
@@ -966,12 +971,12 @@ export default function App() {
                   ) : (
                     <div className="space-y-2.5">
                       {emails.map((m) => (
-                        <div key={m.id} className="p-3.5 bg-surface-2/40 border border-border/50 rounded-2xl flex items-center justify-between gap-3">
+                        <div key={m.id} className="p-3.5 bg-surface-2/40 border border-border/50 flex items-center justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="font-semibold text-xs text-ink truncate">{m.sender?.emailAddress?.name || m.sender?.emailAddress?.address || "Unknown"}</span>
                               {m.isDraft && (
-                                <span className="text-[9px] bg-amber-500/10 text-amber-500 border border-amber-500/20 px-1.5 py-0.5 rounded-full font-mono font-bold">Draft</span>
+                                <span className="text-[9px] bg-amber-500/10 text-amber-500 border border-amber-500/20 px-1.5 py-0.5 font-mono font-bold uppercase tracking-wider">Draft</span>
                               )}
                             </div>
                             {editingEmailId === m.id ? (
@@ -1026,7 +1031,7 @@ export default function App() {
                   }
                 >
                   {showEventForm && (
-                    <form onSubmit={submitEvent} className="mb-6 p-4 bg-surface-2/80 border border-border rounded-2xl space-y-3">
+                    <form onSubmit={submitEvent} className="mb-6 p-4 bg-surface-2/80 border border-border space-y-3">
                       <div className="flex items-center justify-between border-b border-border/60 pb-2">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-ink-muted">
                           {editingEventId ? "Edit Event" : "New Event"}
@@ -1087,7 +1092,7 @@ export default function App() {
                   ) : (
                     <div className="space-y-2.5">
                       {events.map((evt) => (
-                        <div key={evt.id} className="p-3.5 bg-surface-2/40 border border-border/50 rounded-2xl flex items-center justify-between gap-3">
+                        <div key={evt.id} className="p-3.5 bg-surface-2/40 border border-border/50 flex items-center justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <h4 className="font-semibold text-xs text-ink truncate">{evt.subject}</h4>
                             <p className="text-[11px] text-ink-muted mt-0.5 font-mono">
@@ -1255,7 +1260,7 @@ function renderSessionRow(
       {isMenuOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="absolute right-0 top-9 w-44 bg-surface/95 backdrop-blur-2xl border border-border shadow-2xl rounded-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100"
+          className="absolute right-0 top-9 w-44 bg-surface/95 backdrop-blur-2xl border border-border shadow-2xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100"
         >
           <button
             onClick={() => togglePinOptimistic(s.session_id)}
