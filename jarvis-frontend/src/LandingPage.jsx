@@ -659,10 +659,13 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
           </div>
         </section>
 
-        {/* LIVE OPERATIONS — the real agent console readout */}
-        <section className="pb-16">
+        {/* EXECUTION TRACE (terminal playground) */}
+        <section
+          ref={terminalRef}
+          className={`reveal-up ${terminalVisible ? "is-visible" : ""} pb-16`}
+        >
           <div className="mb-6">
-            <Kicker index="02">Live operations</Kicker>
+            <Kicker index="02">Execution trace</Kicker>
           </div>
           <motion.div
             initial={{ opacity: 0, y: 24 }}
