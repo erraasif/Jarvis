@@ -181,3 +181,14 @@ body::before {
   .waveform-bar { animation: none; height: 7px; }
   .reveal-up { opacity: 1; transform: none; transition: none; }
 }
+
+@keyframes voice-preview-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.12); opacity: 1; }
+}
+.voice-preview-pulse {
+  animation: voice-preview-pulse 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .voice-preview-pulse { animation: none; }
+}

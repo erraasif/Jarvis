@@ -14,6 +14,7 @@ import {
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Room } from 'livekit-client';
+import VoiceMode from './VoiceMode';
 
 import LandingPage from "./LandingPage.jsx";
 import Logo from "./Logo.jsx";
@@ -81,6 +82,7 @@ export default function App() {
   const [voiceConnecting, setVoiceConnecting] = useState(false);
   const [voiceError, setVoiceError] = useState("");
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceModeVisible, setVoiceModeVisible] = useState(false);
   const voiceRoomRef = useRef(null);
 
   // Theme
@@ -197,6 +199,7 @@ export default function App() {
       document.querySelectorAll('audio[data-livekit-audio]').forEach((el) => el.remove());
       setVoiceConnected(false);
       setIsSpeaking(false);
+      setVoiceModeVisible(false);
       return;
     }
 
@@ -231,6 +234,7 @@ export default function App() {
 
       room.on('connected', () => {
         setVoiceConnected(true);
+        setVoiceModeVisible(true);
         setVoiceConnecting(false);
         setVoiceError("");
         console.log('🎤 Voice connected!');
@@ -239,6 +243,7 @@ export default function App() {
       room.on('disconnected', () => {
         setVoiceConnected(false);
         setIsSpeaking(false);
+        setVoiceModeVisible(false);
         document.querySelectorAll('audio[data-livekit-audio]').forEach((el) => el.remove());
         console.log('🎤 Voice disconnected');
       });
@@ -639,6 +644,18 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-bg text-ink font-body selection:bg-accent/30 transition-colors duration-300">
+      {voiceConnected && voiceModeVisible && (
+        <VoiceMode
+          voiceRoomRef={voiceRoomRef}
+          isSpeaking={isSpeaking}
+          voiceConnecting={voiceConnecting}
+          onDisconnect={connectVoice}
+          onQuickAction={(tabId) => {
+            setActiveTab(tabId);
+            setVoiceModeVisible(false);
+          }}
+        />
+      )}
       <div className="flex h-screen overflow-hidden">
         {/* Sidebar */}
         <aside
@@ -907,9 +924,14 @@ export default function App() {
                     disabled={loading || !isAuthenticated}
                   />
                   {voiceConnected && (
-                    <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setVoiceModeVisible(true)}
+                      className="flex items-center gap-1 px-1"
+                      title="Reopen voice mode"
+                    >
                       <div className={`w-2 h-2 rounded-full ${isSpeaking ? 'bg-accent animate-pulse' : 'bg-emerald-500'}`} />
-                    </div>
+                    </button>
                   )}
                   <button
                     type="submit"

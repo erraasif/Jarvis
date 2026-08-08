@@ -347,6 +347,39 @@ function useReveal() {
   return [ref, visible];
 }
 
+function VoiceModePreview() {
+  const [ref, visible] = useReveal();
+  return (
+    <div
+      ref={ref}
+      className={`reveal-up ${visible ? "is-visible" : ""} relative mt-16 w-full rounded-3xl border border-border/70 bg-surface/70 backdrop-blur-xl p-8 sm:p-12 overflow-hidden`}
+    >
+      <div className="console-grid absolute inset-0 pointer-events-none opacity-50" />
+      <div className="relative flex flex-col items-center text-center gap-6">
+        <span className="text-[10px] uppercase tracking-widest text-ink-muted font-mono">Voice Mode Preview</span>
+
+        <div className="relative flex items-center justify-center" style={{ width: 180, height: 180 }}>
+          <div
+            className="absolute rounded-full voice-preview-pulse"
+            style={{
+              width: 150,
+              height: 150,
+              background: "radial-gradient(circle at 35% 30%, var(--color-glow-2), var(--color-accent) 55%, transparent 78%)",
+            }}
+          />
+          <div className="absolute rounded-full border border-accent/40" style={{ width: 180, height: 180 }} />
+          <Mic size={22} className="relative z-10 text-bg" />
+        </div>
+
+        <p className="max-w-md text-sm text-ink-muted">
+          A full-screen presence that listens and reacts in real time — mail, calendar, and to-dos are one sentence
+          away. This is a preview; the real thing runs after you sign in.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function LandingPage({ onLogin, isDark, setIsDark }) {
   const [activeTab, setActiveTab] = useState("mail");
   const [isVoiceSupported, setIsVoiceSupported] = useState(true);
@@ -513,6 +546,8 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
             <FeatureCard key={f.label} index={i} {...f} />
           ))}
         </div>
+
+        <VoiceModePreview />
 
         {/* Terminal Playground */}
         <div ref={terminalRef} className={`reveal-up ${terminalVisible ? "is-visible" : ""} relative mt-16 w-full`}>
