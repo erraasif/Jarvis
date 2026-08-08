@@ -251,3 +251,39 @@ body::before {
   .hud-caret, .hud-sweep, .hud-meter-bar { animation: none; }
   .hud-meter-bar { transform: scaleY(0.6); }
 }
+
+/* --- Radar scope: the hero signature element --------------------------- */
+
+/* Rotating sweep wedge. A conic gradient masked to a disc reads as a real
+   radar sweep — technical, not a glowing orb. */
+@keyframes radar-spin { to { transform: rotate(360deg); } }
+.radar-sweep {
+  background: conic-gradient(
+    from 0deg,
+    color-mix(in srgb, var(--color-accent) 42%, transparent) 0deg,
+    color-mix(in srgb, var(--color-accent) 10%, transparent) 34deg,
+    transparent 60deg,
+    transparent 360deg
+  );
+  animation: radar-spin 4.5s linear infinite;
+}
+
+/* Blip acquire ping — a target being lit up by the passing sweep. */
+@keyframes radar-ping {
+  0% { transform: scale(0.5); opacity: 0.85; }
+  70% { opacity: 0.15; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+.radar-ping { animation: radar-ping 3s ease-out infinite; }
+
+/* Faint bearing readout that tracks with the sweep line. */
+@keyframes radar-line-spin { to { transform: rotate(360deg); } }
+.radar-line { animation: radar-line-spin 4.5s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .radar-sweep, .radar-ping, .radar-line { animation: none; }
+  .radar-sweep { opacity: 0.4; }
+}
+
+/* Count-up metric readouts use tabular figures for a stable, instrument feel */
+.metric-value { font-variant-numeric: tabular-nums; }
