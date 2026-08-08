@@ -320,6 +320,12 @@ async def entrypoint(ctx: JobContext):
         instructions=get_dynamic_system_prompt(user_email, user_timezone),
         tools=build_tools(user_email),
     )
+
+    session.on("user_state_changed", lambda ev: logger.info("user_state_changed: %s", ev.new_state))
+    session.on("agent_state_changed", lambda ev: logger.info("agent_state_changed: %s", ev.new_state))
+    session.on("user_input_transcribed", lambda ev: logger.info("transcribed (final=%s): %r", ev.is_final, ev.transcript))
+    session.on("error", lambda ev: logger.error("session error: %s", ev.error))
+
     await session.start(room=ctx.room, agent=agent, room_input_options=RoomInputOptions())
     await session.generate_reply(instructions="Greet the user briefly as Jarvis and ask how you can help.")
 
