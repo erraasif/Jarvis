@@ -274,6 +274,14 @@ export default function App() {
       await room.connect(LIVEKIT_URL, token);
       voiceRoomRef.current = room;
 
+      try {
+        await room.localParticipant.setMicrophoneEnabled(true);
+        console.log('🎙️ Microphone enabled and publishing');
+      } catch (micError) {
+        console.error('Microphone permission error:', micError);
+        setVoiceError('Microphone access denied — check your browser permissions.');
+      }
+
     } catch (error) {
       console.error('Voice connection error:', error);
       setVoiceError(error.message || 'Failed to connect voice');
