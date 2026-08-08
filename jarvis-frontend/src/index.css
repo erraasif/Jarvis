@@ -252,38 +252,60 @@ body::before {
   .hud-meter-bar { transform: scaleY(0.6); }
 }
 
-/* --- Radar scope: the hero signature element --------------------------- */
+/* --- Mascot ambient glow: the pool of light the 3D core sits in -------- */
 
-/* Rotating sweep wedge. A conic gradient masked to a disc reads as a real
-   radar sweep — technical, not a glowing orb. */
-@keyframes radar-spin { to { transform: rotate(360deg); } }
-.radar-sweep {
-  background: conic-gradient(
-    from 0deg,
-    color-mix(in srgb, var(--color-accent) 42%, transparent) 0deg,
-    color-mix(in srgb, var(--color-accent) 10%, transparent) 34deg,
-    transparent 60deg,
-    transparent 360deg
-  );
-  animation: radar-spin 4.5s linear infinite;
+/* Twin-accent radial aura behind the mascot canvas. Breathes slowly so the
+   whole stage feels alive without any hard-edged decoration. */
+@keyframes mascot-aura {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.06); }
+}
+.mascot-aura {
+  background:
+    radial-gradient(circle at 50% 45%,
+      color-mix(in srgb, var(--color-accent) 55%, transparent) 0%,
+      color-mix(in srgb, var(--color-accent) 18%, transparent) 32%,
+      transparent 62%),
+    radial-gradient(circle at 62% 62%,
+      color-mix(in srgb, var(--color-glow-2) 40%, transparent) 0%,
+      transparent 55%);
+  filter: blur(46px);
+  animation: mascot-aura 7s ease-in-out infinite;
 }
 
-/* Blip acquire ping — a target being lit up by the passing sweep. */
-@keyframes radar-ping {
-  0% { transform: scale(0.5); opacity: 0.85; }
-  70% { opacity: 0.15; }
-  100% { transform: scale(2.6); opacity: 0; }
+/* Concentric guide rings drawn under the canvas — a subtle target reticle
+   that grounds the floating core in "instrument" space. */
+.mascot-reticle {
+  background-image:
+    radial-gradient(circle, transparent 0 29%, color-mix(in srgb, var(--color-ink) 8%, transparent) 29% 29.4%, transparent 29.4%),
+    radial-gradient(circle, transparent 0 44%, color-mix(in srgb, var(--color-ink) 6%, transparent) 44% 44.3%, transparent 44.3%);
 }
-.radar-ping { animation: radar-ping 3s ease-out infinite; }
 
-/* Faint bearing readout that tracks with the sweep line. */
-@keyframes radar-line-spin { to { transform: rotate(360deg); } }
-.radar-line { animation: radar-line-spin 4.5s linear infinite; }
+/* Text with a soft accent halo for the hero headline highlight. */
+.text-glow-accent {
+  color: var(--color-accent);
+  text-shadow: 0 0 22px color-mix(in srgb, var(--color-accent) 55%, transparent);
+}
+
+/* Glowing CTA — a real halo, on brand with the "next-level" ask. */
+.btn-glow {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-accent) 60%, transparent),
+    0 8px 30px color-mix(in srgb, var(--color-accent) 45%, transparent);
+  transition: box-shadow 0.25s ease, transform 0.15s ease;
+}
+.btn-glow:hover {
+  box-shadow:
+    0 0 0 1px var(--color-accent),
+    0 10px 42px color-mix(in srgb, var(--color-accent) 65%, transparent);
+}
+
+@keyframes float-chip {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.float-chip { animation: float-chip 5s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  .radar-sweep, .radar-ping, .radar-line { animation: none; }
-  .radar-sweep { opacity: 0.4; }
+  .mascot-aura, .float-chip { animation: none; }
 }
-
-/* Count-up metric readouts use tabular figures for a stable, instrument feel */
-.metric-value { font-variant-numeric: tabular-nums; }

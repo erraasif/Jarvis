@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import Logo from "./Logo";
 import { ThemeToggle } from "./ThemeToggle";
+import JarvisMascot from "./JarvisMascot";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "https://jarvis-backend-h38f.onrender.com";
@@ -403,6 +404,89 @@ function CapabilityPanel({ icon: Icon, id, label, title, body, index }) {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Mascot stage — the 3D core is the hero centerpiece                          */
+/* -------------------------------------------------------------------------- */
+
+// Small glassy readout that floats around the mascot.
+function FloatingChip({ className = "", delay = 0, children }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      className={`absolute z-20 float-chip border border-border/80 bg-surface/70 backdrop-blur-md px-3 py-2 shadow-xl shadow-black/40 ${className}`}
+      style={{ animationDelay: `${delay}s` }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function MascotStage() {
+  return (
+    <div className="relative w-full aspect-square max-w-[520px] mx-auto">
+      {/* Ambient glow pool + reticle sit behind the canvas */}
+      <div className="mascot-aura pointer-events-none absolute inset-[8%] rounded-full" />
+      <div className="mascot-reticle pointer-events-none absolute inset-0 opacity-70" />
+
+      {/* The 3D core */}
+      <JarvisMascot className="absolute inset-0 h-full w-full" />
+
+      {/* Floating live readouts around the core */}
+      <FloatingChip className="left-0 top-[14%]" delay={0.5}>
+        <div className="flex items-center gap-2 font-mono">
+          <StatusDot tone="ok" />
+          <div className="leading-tight">
+            <div className="text-[10px] font-semibold text-ink">Neural core</div>
+            <div className="text-[8.5px] uppercase tracking-wider text-emerald-400">
+              online
+            </div>
+          </div>
+        </div>
+      </FloatingChip>
+
+      <FloatingChip className="right-0 top-[22%]" delay={0.75}>
+        <div className="font-mono leading-tight text-right">
+          <div className="metric-value text-[13px] font-bold text-accent">612ms</div>
+          <div className="text-[8.5px] uppercase tracking-wider text-ink-muted">
+            voice latency
+          </div>
+        </div>
+      </FloatingChip>
+
+      <FloatingChip className="left-[4%] bottom-[16%]" delay={1}>
+        <div className="flex items-center gap-2 font-mono">
+          <Radio size={13} className="text-accent" />
+          <div className="leading-tight">
+            <div className="text-[10px] font-semibold text-ink">LiveKit</div>
+            <div className="text-[8.5px] uppercase tracking-wider text-ink-muted">
+              streaming
+            </div>
+          </div>
+        </div>
+      </FloatingChip>
+
+      <FloatingChip className="right-[2%] bottom-[24%]" delay={1.25}>
+        <div className="flex items-center gap-2 font-mono">
+          <div className="flex items-end gap-[2px] h-4">
+            {[0, 0.15, 0.3, 0.45, 0.6].map((d, i) => (
+              <span
+                key={i}
+                className="hud-meter-bar w-[3px] bg-glow-2"
+                style={{ "--meter-delay": `${d}s`, height: "100%", backgroundColor: "var(--color-glow-2)" }}
+              />
+            ))}
+          </div>
+          <span className="text-[8.5px] uppercase tracking-wider text-ink-muted">
+            listening
+          </span>
+        </div>
+      </FloatingChip>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* Main landing page                                                           */
 /* -------------------------------------------------------------------------- */
 
@@ -442,9 +526,17 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
 
   return (
     <div className="relative min-h-screen bg-bg text-ink transition-colors duration-300 selection:bg-accent/30">
-      {/* Technical grid backdrop — sharp, not glowing */}
-      <div className="fixed inset-0 pointer-events-none -z-10">
-        <div className="hud-grid absolute inset-0 opacity-[0.5]" />
+      {/* Backdrop — technical grid grounded by a soft ambient glow */}
+      <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
+        <div className="hud-grid absolute inset-0 opacity-[0.4]" />
+        <div
+          className="absolute -top-1/4 right-[-10%] h-[70vh] w-[70vh] rounded-full opacity-40 blur-[120px]"
+          style={{ backgroundColor: "var(--color-accent)" }}
+        />
+        <div
+          className="absolute bottom-[-20%] left-[-10%] h-[55vh] w-[55vh] rounded-full opacity-25 blur-[120px]"
+          style={{ backgroundColor: "var(--color-glow-2)" }}
+        />
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent" />
       </div>
 
@@ -519,7 +611,7 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
             >
               <button
                 onClick={handleLogin}
-                className="group relative inline-flex w-full sm:w-auto items-center justify-center gap-2.5 px-6 py-3.5 bg-accent text-accent-ink font-semibold text-sm border border-accent transition-all duration-150 hover:bg-accent/90 active:translate-y-px cursor-pointer"
+                className="btn-glow group relative inline-flex w-full sm:w-auto items-center justify-center gap-2.5 px-6 py-3.5 bg-accent text-accent-ink font-semibold text-sm border border-accent hover:bg-accent/90 active:translate-y-px cursor-pointer"
               >
                 <span>Sign in with Microsoft</span>
                 <ArrowRight size={16} className="transition-transform duration-200 group-hover:translate-x-1" />
@@ -544,13 +636,14 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
             </motion.div>
           </div>
 
-          {/* Right column — the console centerpiece */}
+          {/* Right column — the 3D mascot centerpiece */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.15, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            className="relative"
           >
-            <AgentConsole />
+            <MascotStage />
           </motion.div>
         </section>
 
@@ -566,13 +659,28 @@ export default function LandingPage({ onLogin, isDark, setIsDark }) {
           </div>
         </section>
 
+        {/* LIVE OPERATIONS — the real agent console readout */}
+        <section className="pb-16">
+          <div className="mb-6">
+            <Kicker index="02">Live operations</Kicker>
+          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <AgentConsole />
+          </motion.div>
+        </section>
+
         {/* EXECUTION TRACE (terminal playground) */}
         <section
           ref={terminalRef}
           className={`reveal-up ${terminalVisible ? "is-visible" : ""} pb-16`}
         >
           <div className="mb-6">
-            <Kicker index="02">Execution trace</Kicker>
+            <Kicker index="03">Execution trace</Kicker>
           </div>
 
           <div className="relative border border-border bg-surface/80 backdrop-blur-md">
