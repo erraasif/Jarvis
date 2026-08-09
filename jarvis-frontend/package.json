@@ -13,7 +13,7 @@
     "@react-three/drei": "^10.0.0",
     "@react-three/fiber": "^9.0.0",
     "@react-three/postprocessing": "^3.0.4",
-    "three": "^0.171.0",
+    "three": "^0.182.0",
     "axios": "^1.18.1",
     "framer-motion": "^12.43.0",
     "livekit-client": "^2.15.0",
