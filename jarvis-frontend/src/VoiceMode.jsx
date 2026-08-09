@@ -104,9 +104,15 @@ export default function VoiceMode({ voiceRoomRef, isSpeaking, voiceConnecting, o
 
   const toggleMute = async () => {
     const room = voiceRoomRef?.current;
-    if (!room?.localParticipant) return;
+    const micPublication = room?.localParticipant?.getTrackPublication?.(Track.Source.Microphone);
+    const micTrack = micPublication?.track;
+    if (!micTrack) return;
     try {
-      await room.localParticipant.setMicrophoneEnabled(muted);
+      if (muted) {
+        await micTrack.unmute();
+      } else {
+        await micTrack.mute();
+      }
       setMuted((m) => !m);
     } catch (e) {
       console.error("Voice Mode: failed to toggle mic", e);
@@ -171,7 +177,7 @@ export default function VoiceMode({ voiceRoomRef, isSpeaking, voiceConnecting, o
 
       {/* 3D avatar, driven by real audio level */}
       <div className="relative w-full max-w-[280px] aspect-square">
-        <JarvisMascot className="absolute inset-0 h-full w-full" audioLevelRef={audioLevelRef} />
+        <JarvisMascot className="absolute inset-0 h-full w-full" audioLevelRef={audioLevelRef} variant="voice" />
       </div>
 
       {/* Tap-to-mute mic -- a real toggle on the actual published track */}

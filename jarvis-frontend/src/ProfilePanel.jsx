@@ -34,7 +34,7 @@ export function applyStoredAccent() {
   }
 }
 
-export default function ProfilePanel({ email, isDark, setIsDark, onLogout, onClose }) {
+export default function ProfilePanel({ email, isDark, setIsDark, onLogout, onClose, onDisplayNameChange }) {
   const [selectedAccent, setSelectedAccent] = useState(() => {
     return localStorage.getItem("jarvis_accent_id") || "indigo";
   });
@@ -57,6 +57,7 @@ export default function ProfilePanel({ email, isDark, setIsDark, onLogout, onClo
     const val = e.target.value;
     setDisplayName(val);
     localStorage.setItem("jarvis_display_name", val);
+    onDisplayNameChange?.(val);
   };
 
   return (

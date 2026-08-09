@@ -8,7 +8,7 @@
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
   /* Rich Obsidian-Violet System */
-  --color-bg: light-dark(#F4F2EE, #0B0914);
+  --color-bg: light-dark(#F4F2EE, #13111F);
   --color-surface: light-dark(#FFFFFF, #131124);
   --color-surface-2: light-dark(#EFECE6, #1A172E);
   --color-border: light-dark(#E0DDD5, #292440);
@@ -231,4 +231,82 @@ body::before {
 .mic-pulse {
   box-shadow: 0 0 calc(10px + var(--mic-level, 0) * 40px) color-mix(in srgb, var(--color-accent) calc(40% + var(--mic-level, 0) * 40%), transparent);
   transition: box-shadow 0.08s linear;
+}
+
+/* ==========================================================================
+   LANDING HERO — mascot glow, accent text glow, CTA halo, floating chips
+   ========================================================================== */
+
+@keyframes mascot-aura {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.06); }
+}
+.mascot-aura {
+  background:
+    radial-gradient(circle at 50% 45%,
+      color-mix(in srgb, var(--color-accent) 55%, transparent) 0%,
+      color-mix(in srgb, var(--color-accent) 18%, transparent) 32%,
+      transparent 62%),
+    radial-gradient(circle at 62% 62%,
+      color-mix(in srgb, var(--color-glow-2) 40%, transparent) 0%,
+      transparent 55%);
+  filter: blur(46px);
+  animation: mascot-aura 7s ease-in-out infinite;
+}
+
+.text-glow-accent {
+  text-shadow: 0 0 22px color-mix(in srgb, var(--color-accent) 55%, transparent);
+}
+
+.btn-glow {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-accent) 60%, transparent),
+    0 8px 30px color-mix(in srgb, var(--color-accent) 45%, transparent);
+  transition: box-shadow 0.25s ease, transform 0.15s ease;
+}
+.btn-glow:hover {
+  box-shadow:
+    0 0 0 1px var(--color-accent),
+    0 10px 42px color-mix(in srgb, var(--color-accent) 65%, transparent);
+}
+
+@keyframes float-chip {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.float-chip { animation: float-chip 5s ease-in-out infinite; }
+
+@keyframes hud-meter {
+  0%, 100% { transform: scaleY(0.25); }
+  50% { transform: scaleY(1); }
+}
+.hud-meter-bar {
+  transform-origin: bottom;
+  animation: hud-meter 1s ease-in-out infinite;
+  animation-delay: var(--meter-delay, 0s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mascot-aura, .float-chip, .hud-meter-bar { animation: none; }
+}
+
+/* ==========================================================================
+   CUSTOM SCROLLBAR — thin, rounded, on-brand instead of the default OS bar
+   ========================================================================== */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-accent) 45%, transparent) transparent;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+  border-radius: 999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--color-accent) 70%, transparent);
 }

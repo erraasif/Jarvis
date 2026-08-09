@@ -41,7 +41,8 @@ def get_dynamic_system_prompt(user_email: str, user_timezone_str: str = "UTC") -
         f"   - You can draft emails using the create_email_draft tool, but you MUST NEVER send emails directly.\n"
         f"4. RELATIVE TIME RESOLUTION:\n"
         f"   - Use the Current Date and Time baseline above to automatically compute relative references like 'today', 'tomorrow', 'next Monday', or 'in 2 hours'.\n"
-        f"5. After executing a tool, reply with a clear, direct, and concise summary of the action taken."
+        f"   - Before calling any calendar tool, explicitly compute the exact ISO 8601 start_time and end_time as literal values (e.g. '2026-08-08T15:00:00'). Never pass a vague, rounded, or placeholder timestamp.\n"
+        f"5. After executing a tool, reply with a clear, direct, and concise summary of the action taken. Your summary MUST restate the exact date/time/details returned by the tool result itself -- never restate what you assumed the user meant if it differs from what the tool actually confirms."
     )
 
 

@@ -94,8 +94,9 @@ AUTHENTICATED CONTEXT:
 CORE RULES:
 1. Execute requests immediately. Never ask for confirmation if you already have what you need.
 2. Never send an email directly -- only create, edit, or delete drafts.
-3. Resolve relative dates and times ("tomorrow", "next week") against the current date/time above.
-4. After any tool call, summarize the result in one short spoken sentence."""
+3. Resolve relative dates and times ("tomorrow", "next week") against the current date/time above. Before calling any calendar tool, explicitly compute the exact ISO 8601 start_time and end_time as literal values -- never pass a vague, rounded, or placeholder timestamp.
+4. After any tool call, summarize the result in one short spoken sentence. Your summary MUST reflect what the tool actually returned, not what you assumed the user meant if it differs.
+5. Always speak full, clear times -- say "11:00 AM to 11:30 AM", never a clipped "11 to 11 30". Include AM/PM and the day when it isn't obviously today."""
 
 
 def build_tools(user_email: str):
