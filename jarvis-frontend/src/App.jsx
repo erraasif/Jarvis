@@ -331,12 +331,17 @@ export default function App() {
   // ============ AUTH HANDLERS ============
   const handleLogin = () => { window.location.href = `${API_BASE_URL}/api/auth/login`; };
   
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (voiceRoomRef.current) {
-      voiceRoomRef.current.disconnect();
+      try {
+        await voiceRoomRef.current.disconnect();
+      } catch (e) {
+        console.warn("Error disconnecting voice room during logout:", e);
+      }
       voiceRoomRef.current = null;
     }
     setVoiceConnected(false);
+    setVoiceModeVisible(false);
     localStorage.removeItem("jarvis_user_email");
     setIsAuthenticated(false);
   };
