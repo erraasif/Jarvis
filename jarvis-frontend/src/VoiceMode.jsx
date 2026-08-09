@@ -23,6 +23,16 @@ export default function VoiceMode({ voiceRoomRef, isSpeaking, voiceConnecting, o
   const startRef = useRef(Date.now());
   const isSpeakingRef = useRef(isSpeaking);
 
+  // Sync the mute button with the track's real state on mount, rather than
+  // assuming unmuted -- the track can already be muted from a previous
+  // Voice Mode session if the user minimized instead of ending the call.
+  useEffect(() => {
+    const micPublication = voiceRoomRef?.current?.localParticipant?.getTrackPublication?.(Track.Source.Microphone);
+    if (micPublication?.track) {
+      setMuted(!!micPublication.track.isMuted);
+    }
+  }, [voiceRoomRef]);
+
   useEffect(() => {
     isSpeakingRef.current = isSpeaking;
   }, [isSpeaking]);
