@@ -334,6 +334,9 @@ async def entrypoint(ctx: JobContext):
         "todos": "The user just tapped the To-Do quick action in Voice Mode. Check their task list and summarize what's there in one or two spoken sentences.",
     }
 
+    async def _run_quick_action_reply(instructions):
+        await session.generate_reply(instructions=instructions)
+
     def _on_data_received(packet):
         try:
             payload = json.loads(packet.data.decode("utf-8"))
@@ -346,7 +349,7 @@ async def entrypoint(ctx: JobContext):
         if not instructions:
             return
         logger.info("quick_action received: %s", action)
-        asyncio.create_task(session.generate_reply(instructions=instructions))
+        asyncio.create_task(_run_quick_action_reply(instructions))
 
     ctx.room.on("data_received", _on_data_received)
 
