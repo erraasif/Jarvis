@@ -6,16 +6,19 @@ Microsoft 365 tools, dynamic time context, and state propagation.
 """
 
 from datetime import datetime
+import logging
 import pytz
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 from langchain_groq import ChatGroq
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import AIMessage, SystemMessage
 
 from app.agent.state import AgentState
 from app.agent.tools.mail_tools import get_emails, create_email_draft, update_email_draft, delete_email_draft
 from app.agent.tools.calendar_tools import get_calendar_events, create_calendar_event, update_calendar_event, delete_calendar_event
 from app.agent.tools.todo_tools import get_todos, create_todo, update_todo, delete_todo
+
+logger = logging.getLogger("jarvis-graph")
 
 tools = [
     get_emails, create_email_draft, update_email_draft, delete_email_draft,
@@ -81,8 +84,24 @@ def agent_node(state: AgentState):
 
     messages = [system_msg] + messages
 
-    response = llm.invoke(messages)
-    return {"messages": [response]}
+    # Groq occasionally emits a malformed tool-call that its own API rejects
+    # with a "failed_generation" / tool_use_failed error before it even
+    # reaches our code -- a known model-generation reliability quirk, not a
+    # bug in our tool schemas. Retry once; it usually succeeds on retry
+    # since the failure is stochastic, not deterministic.
+    last_error = None
+    for attempt in range(2):
+        try:
+            response = llm.invoke(messages)
+            return {"messages": [response]}
+        except Exception as e:
+            last_error = e
+            if "failed_generation" not in str(e) and "tool_use_failed" not in str(e):
+                raise
+            logger.warning("Groq tool-call generation failed (attempt %d/2): %s", attempt + 1, e)
+
+    logger.error("Groq tool-call generation failed after retry: %s", last_error)
+    return {"messages": [AIMessage(content="Sorry, I had trouble processing that request. Could you rephrase it?")]}
 
 
 def should_continue(state: AgentState):
