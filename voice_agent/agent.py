@@ -287,34 +287,16 @@ def _groq_llm():
     )
 
 
+def prewarm(proc):
+    # Load heavy models once per worker process, not once per session.
+    # Reloading Silero VAD from disk on every single call (the previous
+    # behavior) is real, avoidable memory/CPU overhead on every session --
+    # a plausible contributor to the OOM kill (-9) seen mid-conversation.
+    proc.userdata["vad"] = silero.VAD.load()
+
+
 async def entrypoint(ctx: JobContext):
     await ctx.connect()
-
-    def _on_track_subscribed(track, publication, participant):
-        logger.info(
-            "track_subscribed: kind=%s sid=%s participant=%s muted=%s",
-            track.kind, publication.sid, participant.identity, publication.muted,
-        )
-        if track.kind == 1:  # rtc.TrackKind.KIND_AUDIO
-            asyncio.create_task(_log_audio_levels(track))
-
-    async def _log_audio_levels(track):
-        import numpy as np
-        from livekit import rtc
-
-        stream = rtc.AudioStream(track)
-        frame_count = 0
-        try:
-            async for event in stream:
-                frame_count += 1
-                if frame_count % 100 == 0:  # roughly every ~1-2s of audio
-                    data = np.frombuffer(event.frame.data, dtype=np.int16)
-                    rms = float(np.sqrt(np.mean(data.astype(np.float32) ** 2))) if len(data) else 0.0
-                    logger.info("audio_rms: frame=%d rms=%.1f", frame_count, rms)
-        except Exception as e:
-            logger.warning("audio level logging stopped: %s", e)
-
-    ctx.room.on("track_subscribed", _on_track_subscribed)
 
     # Wait for the authenticated participant and read the email/timezone
     # the backend embedded in their token metadata (see app/api/voice.py).
@@ -335,7 +317,7 @@ async def entrypoint(ctx: JobContext):
         stt=deepgram.STT(api_key=os.getenv("DEEPGRAM_API_KEY")),
         llm=_groq_llm(),
         tts=elevenlabs.TTS(api_key=os.getenv("ELEVENLABS_API_KEY")),
-        vad=silero.VAD.load(),
+        vad=ctx.proc.userdata["vad"],
     )
 
     if not user_email:
@@ -384,4 +366,4 @@ async def entrypoint(ctx: JobContext):
 
 
 if __name__ == "__main__":
-    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
+    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint, prewarm_fnc=prewarm))
