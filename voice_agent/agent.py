@@ -290,6 +290,32 @@ def _groq_llm():
 async def entrypoint(ctx: JobContext):
     await ctx.connect()
 
+    def _on_track_subscribed(track, publication, participant):
+        logger.info(
+            "track_subscribed: kind=%s sid=%s participant=%s muted=%s",
+            track.kind, publication.sid, participant.identity, publication.muted,
+        )
+        if track.kind == 1:  # rtc.TrackKind.KIND_AUDIO
+            asyncio.create_task(_log_audio_levels(track))
+
+    async def _log_audio_levels(track):
+        import numpy as np
+        from livekit import rtc
+
+        stream = rtc.AudioStream(track)
+        frame_count = 0
+        try:
+            async for event in stream:
+                frame_count += 1
+                if frame_count % 100 == 0:  # roughly every ~1-2s of audio
+                    data = np.frombuffer(event.frame.data, dtype=np.int16)
+                    rms = float(np.sqrt(np.mean(data.astype(np.float32) ** 2))) if len(data) else 0.0
+                    logger.info("audio_rms: frame=%d rms=%.1f", frame_count, rms)
+        except Exception as e:
+            logger.warning("audio level logging stopped: %s", e)
+
+    ctx.room.on("track_subscribed", _on_track_subscribed)
+
     # Wait for the authenticated participant and read the email/timezone
     # the backend embedded in their token metadata (see app/api/voice.py).
     participant = await ctx.wait_for_participant()

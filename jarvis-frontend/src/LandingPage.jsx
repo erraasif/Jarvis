@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { Suspense, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import Logo from "./Logo";
 import { ThemeToggle } from "./ThemeToggle";
-import JarvisMascot from "./JarvisMascot";
+const JarvisMascot = React.lazy(() => import("./JarvisMascot"));
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "https://jarvis-backend-h38f.onrender.com";
@@ -124,7 +124,9 @@ function MascotStage() {
     <div className="relative w-full aspect-square max-w-[520px] mx-auto">
       <div className="mascot-aura pointer-events-none absolute inset-[8%] rounded-full" />
 
-      <JarvisMascot className="absolute inset-0 h-full w-full" variant="core" />
+      <Suspense fallback={<div className="mascot-aura absolute inset-[8%] rounded-full" />}>
+        <JarvisMascot className="absolute inset-0 h-full w-full" variant="core" />
+      </Suspense>
 
       <FloatingChip className="left-0 top-[14%]" delay={0.5}>
         <div className="flex items-center gap-2 font-mono">

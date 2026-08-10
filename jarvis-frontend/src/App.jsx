@@ -3,18 +3,19 @@
  * Features: Persisted pinned sessions, 3-dot dropdown popover, Collapsible Drawer, Voice Mode
  */
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import {
   MessageSquare, Mail, Calendar, CheckSquare,
   Send, Bot, RefreshCcw, Sparkles, ShieldCheck, Sun, Moon,
   Plus, Trash2, X, AlertCircle, Pencil, Check, History,
   PanelLeftClose, MoreVertical, Pin, PinOff,
-  Mic, MicOff, Volume2
+  Mic, MicOff, Volume2, Copy, CalendarClock, ListTodo
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Room } from 'livekit-client';
-import VoiceMode from './VoiceMode';
+const VoiceMode = React.lazy(() => import('./VoiceMode'));
 
 import LandingPage from "./LandingPage.jsx";
 import Logo from "./Logo.jsx";
@@ -32,6 +33,34 @@ const TABS = [
 ];
 
 const INITIAL_MESSAGE = { sender: "jarvis", text: "Hello! I am Jarvis. How can I assist you with your Outlook Mail, Calendar, or Tasks today?" };
+
+const STARTER_PROMPTS = [
+  { icon: Mail, text: "Summarize my recent emails" },
+  { icon: CalendarClock, text: "What's on my calendar today?" },
+  { icon: ListTodo, text: "Add a task to my to-do list" },
+];
+
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (e) {
+      console.warn("Copy failed:", e);
+    }
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-surface-2 text-ink-muted hover:text-ink cursor-pointer"
+      title="Copy message"
+    >
+      {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+    </button>
+  );
+}
 
 function MarkdownMessage({ text }) {
   return (
@@ -417,12 +446,12 @@ export default function App() {
   };
 
   // ============ CHAT HANDLER ============
-  const handleSendMessage = async (e) => {
+  const handleSendMessage = async (e, overrideText) => {
     if (e) e.preventDefault();
     const userEmail = currentUserEmailFor();
-    if (!inputMessage.trim() || !userEmail || loading) return;
+    const userMsg = overrideText ?? inputMessage;
+    if (!userMsg.trim() || !userEmail || loading) return;
 
-    const userMsg = inputMessage;
     setInputMessage("");
     setLoading(true);
     setMessages((prev) => [...prev, { sender: "user", text: userMsg }, { sender: "jarvis", text: "" }]);
@@ -653,17 +682,19 @@ export default function App() {
   return (
     <div className="min-h-screen bg-bg text-ink font-body selection:bg-accent/30 transition-colors duration-300">
       {voiceConnected && voiceModeVisible && (
-        <VoiceMode
-          voiceRoomRef={voiceRoomRef}
-          isSpeaking={isSpeaking}
-          voiceConnecting={voiceConnecting}
-          onDisconnect={connectVoice}
-          onMinimize={() => setVoiceModeVisible(false)}
-          onQuickAction={(tabId) => {
-            setActiveTab(tabId);
-            setVoiceModeVisible(false);
-          }}
-        />
+        <Suspense fallback={<div className="fixed inset-0 z-[100] bg-bg/98" />}>
+          <VoiceMode
+            voiceRoomRef={voiceRoomRef}
+            isSpeaking={isSpeaking}
+            voiceConnecting={voiceConnecting}
+            onDisconnect={connectVoice}
+            onMinimize={() => setVoiceModeVisible(false)}
+            onQuickAction={(tabId) => {
+              setActiveTab(tabId);
+              setVoiceModeVisible(false);
+            }}
+          />
+        </Suspense>
       )}
       <div className="flex h-screen overflow-hidden">
         {/* Sidebar */}
@@ -885,10 +916,40 @@ export default function App() {
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6 pb-36 w-full max-w-4xl mx-auto custom-scrollbar">
+                {messages.length === 1 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3, duration: 0.4 }}
+                    className="flex flex-wrap gap-2 justify-center pt-2"
+                  >
+                    {STARTER_PROMPTS.map((p) => {
+                      const Icon = p.icon;
+                      return (
+                        <button
+                          key={p.text}
+                          onClick={() => handleSendMessage(null, p.text)}
+                          disabled={loading || !isAuthenticated}
+                          className="flex items-center gap-2 px-3.5 py-2 rounded-full border border-border bg-surface/70 hover:border-accent/50 hover:bg-surface-2 transition-colors text-xs text-ink-muted hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                          <Icon size={13} className="text-accent" />
+                          {p.text}
+                        </button>
+                      );
+                    })}
+                  </motion.div>
+                )}
+                <AnimatePresence initial={false}>
                 {messages.map((msg, index) => {
                   const isStreamingPlaceholder = loading && index === messages.length - 1 && msg.sender === "jarvis" && msg.text === "";
                   return (
-                    <div key={index} className={`flex w-full ${msg.sender === "user" ? "justify-end" : "justify-start"}`}>
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+                      className={`group flex w-full ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
+                    >
                       <div className={`flex gap-3 max-w-[85%] ${msg.sender === "user" ? "flex-row-reverse" : "flex-row"}`}>
                         <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
                           msg.sender === "jarvis"
@@ -897,25 +958,33 @@ export default function App() {
                         }`}>
                           {msg.sender === "jarvis" ? <Bot size={16} /> : "You"}
                         </div>
-                        <div className={`px-4 py-3.5 rounded-2xl shadow-sm min-w-0 ${
-                          msg.sender === "user"
-                            ? "bg-accent text-accent-ink font-medium text-[15px] leading-[1.7]"
-                            : "bg-surface text-ink border border-border/80 w-full"
-                        }`}>
-                          {isStreamingPlaceholder ? (
-                            <span className="flex items-center gap-2 text-xs font-mono text-ink-muted">
-                              <RefreshCcw className="animate-spin" size={13} /> Thinking...
-                            </span>
-                          ) : msg.sender === "jarvis" ? (
-                            <MarkdownMessage text={msg.text} />
-                          ) : (
-                            msg.text
+                        <div className="flex flex-col gap-1 min-w-0">
+                          <div className={`px-4 py-3.5 rounded-2xl shadow-sm min-w-0 ${
+                            msg.sender === "user"
+                              ? "bg-accent text-accent-ink font-medium text-[15px] leading-[1.7]"
+                              : "bg-surface text-ink border border-border/80 w-full"
+                          }`}>
+                            {isStreamingPlaceholder ? (
+                              <span className="flex items-center gap-2 text-xs font-mono text-ink-muted">
+                                <RefreshCcw className="animate-spin" size={13} /> Thinking...
+                              </span>
+                            ) : msg.sender === "jarvis" ? (
+                              <MarkdownMessage text={msg.text} />
+                            ) : (
+                              msg.text
+                            )}
+                          </div>
+                          {!isStreamingPlaceholder && msg.text && (
+                            <div className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"} px-1`}>
+                              <CopyButton text={msg.text} />
+                            </div>
                           )}
                         </div>
                       </div>
-                    </div>
+                    </motion.div>
                   );
                 })}
+                </AnimatePresence>
                 <div ref={chatEndRef} />
               </div>
 

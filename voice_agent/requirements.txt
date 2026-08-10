@@ -4,6 +4,7 @@ livekit-plugins-deepgram
 livekit-plugins-elevenlabs
 livekit-plugins-silero
 livekit-plugins-groq
+numpy
 langchain-core
 langgraph
 python-dotenv
