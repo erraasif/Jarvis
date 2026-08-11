@@ -14,8 +14,9 @@ from app.services.graph_client import graph_request
 @tool
 def get_calendar_events(user_email: str, top: Union[int, str] = 10):
     """
-    Retrieves upcoming calendar events for the user.
-    
+    Retrieves upcoming calendar events for the user (from now through the
+    next 30 days). Never returns past events.
+
     Args:
         user_email: User's primary email address.
         top: Number of events to retrieve (default 10).
@@ -25,7 +26,13 @@ def get_calendar_events(user_email: str, top: Union[int, str] = 10):
     except (ValueError, TypeError):
         top = 10
     user_email = user_email.strip().lower()
-    endpoint = f"/me/events?$top={top}&$select=id,subject,start,end,location,bodyPreview&$orderby=start/dateTime ASC"
+    now = datetime.datetime.utcnow()
+    start = now.strftime("%Y-%m-%dT%H:%M:%S")
+    end = (now + datetime.timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%S")
+    endpoint = (
+        f"/me/calendarView?startDateTime={start}&endDateTime={end}"
+        f"&$top={top}&$select=id,subject,start,end,location,bodyPreview&$orderby=start/dateTime ASC"
+    )
     return graph_request(user_email, "GET", endpoint)
 
 

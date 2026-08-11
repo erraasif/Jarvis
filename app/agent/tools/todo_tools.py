@@ -29,17 +29,23 @@ def _get_default_todo_list_id(user_email: str) -> str:
 
 
 @tool
-def get_todos(user_email: str, list_id: Optional[str] = None):
+def get_todos(user_email: str, list_id: Optional[str] = None, include_completed: bool = False):
     """
-    Fetches tasks from the user's Microsoft To-Do list.
-    
+    Fetches tasks from the user's Microsoft To-Do list. By default, only
+    active tasks (not yet completed) are returned -- pass
+    include_completed=True only if the user explicitly asks to see
+    completed/finished tasks too.
+
     Args:
         user_email: Authenticated user's primary email.
         list_id: Optional specific list ID. Uses default list if omitted.
+        include_completed: If True, also include tasks already marked completed.
     """
     user_email = user_email.strip().lower()
     target_list_id = list_id or _get_default_todo_list_id(user_email)
-    endpoint = f"/me/todo/lists/{target_list_id}/tasks?$select=id,title,status,dueDateTime,createdDateTime"
+    endpoint = f"/me/todo/lists/{target_list_id}/tasks?$select=id,title,status,dueDateTime,createdDateTime&$orderby=createdDateTime DESC"
+    if not include_completed:
+        endpoint += "&$filter=status ne 'completed'"
     return graph_request(user_email, "GET", endpoint)
 
 

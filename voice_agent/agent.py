@@ -227,9 +227,13 @@ def build_tools(user_email: str):
         return _run(delete_calendar_event, user_email=user_email, event_id=event_id)
 
     @function_tool()
-    async def list_todos(context: RunContext) -> str:
-        """Get the user's Microsoft To-Do tasks."""
-        return _run(get_todos, user_email=user_email)
+    async def list_todos(context: RunContext, include_completed: bool = False) -> str:
+        """Get the user's Microsoft To-Do tasks.
+
+        Args:
+            include_completed: only True if the user explicitly asks to also see completed/finished tasks.
+        """
+        return _run(get_todos, user_email=user_email, include_completed=include_completed)
 
     @function_tool()
     async def add_todo(context: RunContext, title: str, due_date_time: Optional[str] = None, timezone: str = "UTC") -> str:
@@ -292,7 +296,16 @@ def prewarm(proc):
     # Reloading Silero VAD from disk on every single call (the previous
     # behavior) is real, avoidable memory/CPU overhead on every session --
     # a plausible contributor to the OOM kill (-9) seen mid-conversation.
-    proc.userdata["vad"] = silero.VAD.load()
+    proc.userdata["vad"] = silero.VAD.load(
+        # Defaults (0.5 / 0.05s) are noise-sensitive -- both of your
+        # teammates' agents got the exact same "too sensitive to
+        # background noise" complaint from the mentor. Raising these
+        # requires a stronger, longer signal before something counts as
+        # speech, filtering out background noise blips.
+        activation_threshold=0.65,
+        min_speech_duration=0.15,
+        min_silence_duration=0.4,
+    )
 
 
 async def entrypoint(ctx: JobContext):
@@ -316,7 +329,14 @@ async def entrypoint(ctx: JobContext):
     session = AgentSession(
         stt=deepgram.STT(api_key=os.getenv("DEEPGRAM_API_KEY")),
         llm=_groq_llm(),
-        tts=elevenlabs.TTS(api_key=os.getenv("ELEVENLABS_API_KEY")),
+        tts=elevenlabs.TTS(
+            api_key=os.getenv("ELEVENLABS_API_KEY"),
+            voice_settings=elevenlabs.tts.VoiceSettings(
+                stability=0.7,       # higher = more consistent tone, less pitch fluctuation
+                similarity_boost=0.75,
+                use_speaker_boost=True,
+            ),
+        ),
         vad=ctx.proc.userdata["vad"],
     )
 

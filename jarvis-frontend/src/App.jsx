@@ -375,7 +375,18 @@ export default function App() {
     setIsAuthenticated(false);
   };
 
-  const handleNewChat = () => {
+  const handleNewChat = async () => {
+    if (voiceRoomRef.current) {
+      try {
+        await voiceRoomRef.current.disconnect();
+      } catch (e) {
+        console.warn("Error disconnecting voice room on new chat:", e);
+      }
+      voiceRoomRef.current = null;
+      setVoiceConnected(false);
+      setVoiceModeVisible(false);
+      setIsSpeaking(false);
+    }
     setCurrentSessionId(crypto.randomUUID());
     setMessages([INITIAL_MESSAGE]);
     setActiveTab("chat");
